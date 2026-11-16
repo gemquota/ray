@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#05080d">
+<meta name="description" content="Ray: a minimal interactive raycasting and visual perception experiment.">
+<title>RAY / minimal vision</title>
+<style>
+:root{color-scheme:dark;--ink:#d9faff;--cyan:#65d7f2;--panel:#08131dcc}
+*{box-sizing:border-box}
+html,body{width:100%;height:100%;margin:0;overflow:hidden;background:#05080d}
+body{background:radial-gradient(ellipse at center,#0b1721 0%,#05080d 72%);font:12px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--ink);-webkit-tap-highlight-color:transparent}
+canvas{display:block;width:100vw;height:100dvh;touch-action:none;background:transparent}
+#hud{position:fixed;left:50%;bottom:max(22px,env(safe-area-inset-bottom));transform:translate(-50%,12px);min-width:150px;max-width:min(88vw,340px);padding:9px 13px;border:1px solid #75dff233;border-radius:7px;background:var(--panel);backdrop-filter:blur(10px);box-shadow:0 8px 32px #0005;opacity:0;pointer-events:none;transition:opacity .22s ease,transform .22s ease}
+#hud.visible{opacity:1;transform:translate(-50%,0)}
+#hud .top{display:flex;justify-content:space-between;gap:18px;align-items:baseline}
+#hud .name{font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:#9abac5}
+#hud .value{font-size:13px;color:#e6fbff;font-variant-numeric:tabular-nums}
+#hud .track{height:2px;margin-top:7px;background:#ffffff18;overflow:hidden;border-radius:2px}
+#hud .fill{height:100%;width:0;background:#79def4;transition:width .06s linear}
+#hud .secondary{display:none;margin-top:6px;padding-top:5px;border-top:1px solid #ffffff13;justify-content:space-between;gap:14px;color:#a9c8d0;font-size:10px}
+#hud.multi .secondary{display:flex}
+#help{position:fixed;right:12px;top:max(10px,env(safe-area-inset-top));font-size:9px;letter-spacing:.12em;color:#8ca9b4;opacity:.0;transition:opacity .3s;pointer-events:none}
+#help.visible{opacity:.58}
+@media(prefers-reduced-motion:reduce){#hud,#help{transition:none}}
+</style>
+</head>
+<body>
+<canvas id="view" aria-label="Raycasting field. Use one, two or three finger gestures to adjust perception."></canvas>
+<div id="hud" role="status" aria-live="polite"><div class="top"><span class="name" id="hudName">RAY POSITIONS</span><span class="value" id="hudValue">64</span></div><div class="track"><div class="fill" id="hudFill"></div></div><div class="secondary"><span id="hudName2">CONTACT PIXEL</span><span id="hudValue2">2.4 px</span></div></div>
+<div id="help">RAY / PERCEPTION FIELD</div>
+<script>
+(()=>{'use strict';
+const canvas=document.getElementById('view'),ctx=canvas.getContext('2d',{alpha:true});
+const hud=document.getElementById('hud'),hudName=document.getElementById('hudName'),hudValue=document.getElementById('hudValue'),hudFill=document.getElementById('hudFill'),hudName2=document.getElementById('hudName2'),hudValue2=document.getElementById('hudValue2');
+let W=0,H=0,dpr=1,angle=-Math.PI/2,last=0,nextSample=0,nextCycle=0,observations=[];
+const TAU=Math.PI*2,limits={positions:[8,256],active:[1,64],width:[.45,5],pixel:[1,12],frequency:[0,120],fov:[12,180]};
+const state={fov:120,positions:64,active:12,rayWidth:1.1,pixelSize:2.4,frequency:12,distribution:0,contactOnly:false,cycleOffset:0,phase:0,paused:false};
+const distributionNames=['UNIFORM','CLUSTERED','PROGRESSIVE'];
+const palette={food:'#9de28c',threat:'#ff7882',object:'#e7b96e',signal:'#91a9ff'};
+const objects=[
+{u:.20,v:.20,r:.022,shape:'circle',type:'food',vx:.075,vy:.052,phase:0},
+{u:.73,v:.17,r:.034,shape:'triangle',type:'threat',vx:-.052,vy:.061,phase:.7},
+{u:.84,v:.63,r:.019,shape:'diamond',type:'food',vx:-.061,vy:-.043,phase:1.2},
+{u:.17,v:.72,r:.030,shape:'hex',type:'object',vx:.048,vy:-.055,phase:2},
+{u:.53,v:.79,r:.025,shape:'square',type:'signal',vx:.037,vy:-.041,phase:2.8},
+{u:.47,v:.11,r:.040,shape:'ellipse',type:'threat',vx:.043,vy:.035,phase:3.5},
+{u:.91,v:.38,r:.027,shape:'kite',type:'object',vx:-.046,vy:.049,phase:4.2},
+{u:.34,v:.48,r:.016,shape:'triangle',type:'food',vx:.067,vy:-.038,phase:5}
+];
+let feedbackTimer=0;
+function clamp(v,a,b){return Math.max(a,Math.min(b,v))}
+function resize(){const r=canvas.getBoundingClientRect();dpr=Math.min(window.devicePixelRatio||1,2);W=r.width;H=r.height;canvas.width=Math.round(W*dpr);canvas.height=Math.round(H*dpr);ctx.setTransform(dpr,0,0,dpr,0,0);sample()}
+function dimensions(o){return{x:(o.u-.5)*W,y:(o.v-.5)*H,r:o.r*Math.min(W,H)}}
+function rayCircle(ox,oy,dx,dy,o){const q=dimensions(o),x=ox-q.x,y=oy-q.y,b=x*dx+y*dy,c=x*x+y*y-q.r*q.r,h=b*b-c;if(h<0)return null;const t=-b-Math.sqrt(h);return t>=0?t:null}
+function edgeDistance(dx,dy){const tx=Math.abs(dx)>1e-8?(W/2)/Math.abs(dx):Infinity,ty=Math.abs(dy)>1e-8?(H/2)/Math.abs(dy):Infinity;return Math.min(tx,ty)}
+function distributionOffset(i,n){
+ if(n<=1)return 0;
+ const t=i/(n-1)*2-1;
+ if(state.distribution===1)return Math.sign(t)*Math.pow(Math.abs(t),2.8)*.32;
+ if(state.distribution===2){const half=Math.ceil(n/2);if(i<half){const q=half<=1?0:i/(half-1);return(q-.5)*.42}const q=(i-half)/Math.max(1,n-half-1);return (i%2===0?-1:1)*(.24+q*.76)*Math.sign(t||1)}
+ return t;
+}
+function sample(){
+ observations=[];
+ const half=state.fov/2*Math.PI/180,n=state.positions;
+ for(let i=0;i<n;i++){
+  const offset=distributionOffset(i,n)*half,dir=angle+offset,dx=Math.cos(dir),dy=Math.sin(dir);
+  let distance=edgeDistance(dx,dy),hit=null;
+  for(const o of objects){const t=rayCircle(0,0,dx,dy,o);if(t!==null&&t<distance){distance=t;hit=o}}
+  observations.push({index:i,dx,dy,distance,hit});
+ }
+}
+function activeObservations(){
+ const n=observations.length,k=Math.min(state.active,n);
+ if(k>=n)return observations;
+ const start=((state.cycleOffset%n)+n)%n,out=[];
+ for(let j=0;j<k;j++)out.push(observations[(start+j)%n]);
+ return out;
+}
+function pathShape(x,y,r,shape,phase){
+ ctx.beginPath();
+ if(shape==='circle')ctx.arc(x,y,r,0,TAU);
+ else if(shape==='ellipse')ctx.ellipse(x,y,r*1.35,r*.68,phase*.25,0,TAU);
+ else{const sides=shape==='triangle'?3:shape==='square'||shape==='diamond'?4:shape==='hex'?6:5;for(let i=0;i<sides;i++){const a=-Math.PI/2+i*TAU/sides+(shape==='diamond'?Math.PI/4:shape==='kite'?.22:0),rr=r*(shape==='kite'&&i===0?1.55:1),px=x+Math.cos(a)*rr,py=y+Math.sin(a)*rr;if(i===0)ctx.moveTo(px,py);else ctx.lineTo(px,py)}ctx.closePath()}
+}
+function draw(){
+ ctx.clearRect(0,0,W,H);const cx=W/2,cy=H/2,half=state.fov/2*Math.PI/180;
+ ctx.save();ctx.translate(cx,cy);
+ ctx.beginPath();ctx.moveTo(0,0);ctx.arc(0,0,Math.hypot(W,H),angle-half,angle+half);ctx.closePath();ctx.fillStyle='#55c9f208';ctx.fill();
+ if(!state.contactOnly){
+  for(const o of objects){const q=dimensions(o);pathShape(q.x,q.y,q.r,o.shape,o.phase);ctx.fillStyle=palette[o.type];ctx.globalAlpha=.88;ctx.fill();ctx.lineWidth=1;ctx.strokeStyle=palette[o.type];ctx.globalAlpha=.55;ctx.stroke();ctx.globalAlpha=1}
+ }
+ const active=activeObservations();
+ for(const ray of active){
+  const x=ray.dx*ray.distance,y=ray.dy*ray.distance;
+  if(!state.contactOnly){ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(x,y);ctx.strokeStyle=ray.hit?(ray.hit.type==='threat'?'#ff7882':palette[ray.hit.type]):'#65d7f2';ctx.globalAlpha=ray.hit?.92:.28;ctx.lineWidth=state.rayWidth;ctx.stroke();ctx.globalAlpha=1}
+  if(ray.hit){ctx.beginPath();ctx.arc(x,y,state.pixelSize,0,TAU);ctx.fillStyle=ray.hit.type==='threat'?'#ff7882':palette[ray.hit.type];ctx.globalAlpha=.96;ctx.fill();ctx.globalAlpha=1}
+ }
+ if(!state.contactOnly){ctx.beginPath();ctx.arc(0,0,2.4,0,TAU);ctx.fillStyle='#d9faff';ctx.fill()}
+ ctx.restore();
+}
+function showFeedback(name,value,ratio,secondary=null){
+ hudName.textContent=name;hudValue.textContent=value;hudFill.style.width=(clamp(ratio,0,1)*100)+'%';
+ if(secondary){hud.classList.add('multi');hudName2.textContent=secondary.name;hudValue2.textContent=secondary.value}
+ else hud.classList.remove('multi');
+ hud.classList.add('visible');clearTimeout(feedbackTimer);feedbackTimer=setTimeout(()=>hud.classList.remove('visible'),1150);
+}
+function feedbackPair(a,b){hudName.textContent=a.name;hudValue.textContent=a.value;hudFill.style.width=(clamp(a.ratio,0,1)*100)+'%';hudName2.textContent=b.name;hudValue2.textContent=b.value;hud.classList.add('multi','visible');clearTimeout(feedbackTimer);feedbackTimer=setTimeout(()=>hud.classList.remove('visible'),1350)}
+function frame(now){
+ const dt=Math.min(.05,(now-last)/1000||0);last=now;
+ for(const o of objects){o.u+=o.vx*dt;o.v+=o.vy*dt;if(o.u<.035||o.u>.965){o.vx*=-1;o.u=clamp(o.u,.035,.965)}if(o.v<.04||o.v>.96){o.vy*=-1;o.v=clamp(o.v,.04,.96)}o.phase+=dt*.45}
+ if(now>=nextSample){sample();nextSample=now+1000/30}
+ if(!state.paused&&state.frequency>0&&now>=nextCycle){state.cycleOffset=(state.cycleOffset+1)%state.positions;nextCycle=now+1000/state.frequency}
+ draw();requestAnimationFrame(frame);
+}
+const pointers=new Map();let gesture=null,lastTap=0,tapCount=0,tapTimer=0,lastTwoTap=0;
+function center(){return{x:W/2,y:H/2}}
+function centroid(){const p=[...pointers.values()];return{x:p.reduce((s,v)=>s+v.x,0)/p.length,y:p.reduce((s,v)=>s+v.y,0)/p.length}}
+function twoState(){const p=[...pointers.values()];if(p.length<2)return null;const dx=p[1].x-p[0].x,dy=p[1].y-p[0].y;return{x:(p[0].x+p[1].x)/2,y:(p[0].y+p[1].y)/2,d:Math.hypot(dx,dy),angle:Math.atan2(dy,dx)}}
+function startGesture(){
+ const count=pointers.size;
+ if(count===1){const p=centroid(),c=center();gesture={count,mode:'pending',start:p,last:p,centerDistance:Math.hypot(p.x-c.x,p.y-c.y),startAngle:Math.atan2(p.y-c.y,p.x-c.x),rotated:false,moved:false}}
+ else if(count===2){gesture={count,mode:'two',last:twoState(),vertical:0,horizontal:0,moved:false}}
+ else if(count===3){gesture={count,mode:'three',last:centroid(),vertical:0,moved:false}}
+ else gesture={count,mode:'ignore'};
+}
+function onDown(e){pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});try{canvas.setPointerCapture(e.pointerId)}catch{}startGesture()}
+function onMove(e){
+ if(!pointers.has(e.pointerId))return;
+ pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+ if(!gesture||gesture.count!==pointers.size)return;
+ if(gesture.mode==='pending'){
+  const p=centroid(),dx=p.x-gesture.start.x,dy=p.y-gesture.start.y,dist=Math.hypot(dx,dy),c=center(),a=Math.atan2(p.y-c.y,p.x-c.x);
+  if(gesture.centerDistance<Math.min(W,H)*.19&&dist>5){gesture.mode='rotate';gesture.lastAngle=a;gesture.moved=true;return}
+  if(dist>7){gesture.mode=Math.abs(dy)>Math.abs(dx)?'positions':'active';gesture.last=p;gesture.moved=true}
+ }
+ if(gesture.mode==='rotate'){
+  const p=centroid(),a=Math.atan2(p.y-center().y,p.x-center().x);let delta=a-gesture.lastAngle;if(delta>Math.PI)delta-=TAU;if(delta< -Math.PI)delta+=TAU;angle+=delta;gesture.lastAngle=a;gesture.moved=true;showFeedback('FOV ROTATION',Math.round(((angle*180/Math.PI)%360+360)%360)+'°',(((angle*180/Math.PI)%360+360)%360)/360);return;
+ }
+ if(gesture.mode==='positions'||gesture.mode==='active'){
+  const p=centroid(),delta=gesture.mode==='positions'?gesture.last.y-p.y:p.x-gesture.last.x;
+  gesture.acc=(gesture.acc||0)+delta;
+  const step=gesture.mode==='positions'?4:1,threshold=gesture.mode==='positions'?16:18;
+  while(Math.abs(gesture.acc)>=threshold){const d=Math.sign(gesture.acc);if(gesture.mode==='positions'){state.positions=clamp(state.positions+d*step,...limits.positions);state.active=clamp(state.active,1,state.positions);sample()}else state.active=clamp(state.active+d,...[1,state.positions]);gesture.acc-=d*threshold}
+  gesture.last=p;gesture.moved=true;
+  if(gesture.mode==='positions')showFeedback('RAY POSITIONS',String(state.positions),(state.positions-limits.positions[0])/(limits.positions[1]-limits.positions[0]));
+  else showFeedback('ACTIVE RAYS',String(state.active),state.active/state.positions);
+  return;
+ }
+ if(gesture.mode==='two'){
+  const cur=twoState(),prev=gesture.last;if(!cur||!prev)return;
+  const dx=cur.x-prev.x,dy=cur.y-prev.y;
+  if(Math.abs(dx)+Math.abs(dy)>1)gesture.moved=true;
+  if(Math.abs(dx)>0.1){gesture.fovAcc=(gesture.fovAcc||0)+dx;while(Math.abs(gesture.fovAcc)>=12){const d=Math.sign(gesture.fovAcc);state.fov=clamp(state.fov+d*1.5,...limits.fov);gesture.fovAcc-=d*12}showFeedback('FOV WIDTH',Math.round(state.fov)+'°',(state.fov-limits.fov[0])/(limits.fov[1]-limits.fov[0]))}
+  if(Math.abs(dy)>0.1){gesture.widthAcc=(gesture.widthAcc||0)-dy;while(Math.abs(gesture.widthAcc)>=14){const d=Math.sign(gesture.widthAcc);state.rayWidth=clamp(state.rayWidth+d*.08,...limits.width);state.pixelSize=clamp(state.pixelSize+d*.18,...limits.pixel);gesture.widthAcc-=d*14}feedbackPair({name:'RAY WIDTH',value:state.rayWidth.toFixed(2),ratio:(state.rayWidth-limits.width[0])/(limits.width[1]-limits.width[0])},{name:'CONTACT PIXEL',value:state.pixelSize.toFixed(1)+' px',ratio:(state.pixelSize-limits.pixel[0])/(limits.pixel[1]-limits.pixel[0])})}
+  gesture.last=cur;return;
+ }
+ if(gesture.mode==='three'){
+  const p=centroid(),dy=gesture.last.y-p.y;gesture.acc=(gesture.acc||0)+dy;
+  while(Math.abs(gesture.acc)>=12){const d=Math.sign(gesture.acc);state.frequency=clamp(state.frequency+d,...limits.frequency);gesture.acc-=d*12}
+  gesture.last=p;gesture.moved=true;showFeedback('CYCLE FREQUENCY',state.frequency===0?'PAUSED':state.frequency+' Hz',state.frequency/limits.frequency[1]);return;
+ }
+}
+function onUp(e){
+ const g=gesture,wasCount=pointers.size;pointers.delete(e.pointerId);
+ if(wasCount===2&&g?.count===2&&!g.moved){state.contactOnly=!state.contactOnly;showFeedback('CONTACT-ONLY VIEW',state.contactOnly?'ON':'OFF',state.contactOnly?1:0)}
+ else if(wasCount===1&&g?.count===1&&!g.moved){const now=performance.now();if(now-lastTap<330){tapCount++;}else tapCount=1;lastTap=now;clearTimeout(tapTimer);tapTimer=setTimeout(()=>{if(tapCount>=2){state.distribution=(state.distribution+1)%distributionNames.length;sample();showFeedback('RAY DISTRIBUTION',distributionNames[state.distribution],state.distribution/(distributionNames.length-1))}tapCount=0},340)}
+ if(pointers.size){startGesture()}else gesture=null;
+}
+canvas.addEventListener('pointerdown',onDown);canvas.addEventListener('pointermove',onMove);canvas.addEventListener('pointerup',onUp);canvas.addEventListener('pointercancel',onUp);canvas.addEventListener('lostpointercapture',e=>{if(pointers.has(e.pointerId))onUp(e)});
+window.addEventListener('resize',resize);resize();document.getElementById('help').classList.add('visible');setTimeout(()=>document.getElementById('help').classList.remove('visible'),2400);requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
