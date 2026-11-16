@@ -1,55 +1,86 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#0a1118"><title>BOIDS / Minimal Vision</title>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#080611">
+<title>RAY // living perception</title>
 <style>
-*{box-sizing:border-box}html,body{width:100%;height:100%;margin:0;overflow:hidden;background:#05080d}
-body{background:radial-gradient(ellipse at center,#0b1721 0%,#05080d 72%)}
-canvas{display:block;width:100vw;height:100dvh;min-height:100%;touch-action:none;background:transparent}
-</style></head><body>
-<canvas id="view" aria-label="Minimal vision field with moving objects and edge-reaching sensory rays"></canvas>
-<script>(()=>{'use strict';
-const canvas=document.getElementById('view'),ctx=canvas.getContext('2d');
-let W=0,H=0,dpr=1,angle=-Math.PI/2,last=0,nextSample=0,observations=[];
-let fov=120,rayCount=64,pollingHz=26;
-const TAU=Math.PI*2;
-const palette={food:'#9de28c',threat:'#ff7882',object:'#e7b96e',signal:'#91a9ff'};
-const objects=[
- {u:.20,v:.20,r:.022,shape:'circle',type:'food',vx:.075,vy:.052,phase:0},
- {u:.73,v:.17,r:.034,shape:'triangle',type:'threat',vx:-.052,vy:.061,phase:.7},
- {u:.84,v:.63,r:.019,shape:'diamond',type:'food',vx:-.061,vy:-.043,phase:1.2},
- {u:.17,v:.72,r:.030,shape:'hex',type:'object',vx:.048,vy:-.055,phase:2},
- {u:.53,v:.79,r:.025,shape:'square',type:'signal',vx:.037,vy:-.041,phase:2.8},
- {u:.47,v:.11,r:.040,shape:'ellipse',type:'threat',vx:.043,vy:.035,phase:3.5},
- {u:.91,v:.38,r:.027,shape:'kite',type:'object',vx:-.046,vy:.049,phase:4.2},
- {u:.34,v:.48,r:.016,shape:'triangle',type:'food',vx:.067,vy:-.038,phase:5}
-];
-function resize(){const r=canvas.getBoundingClientRect();dpr=Math.min(window.devicePixelRatio||1,2);W=r.width;H=r.height;canvas.width=Math.round(W*dpr);canvas.height=Math.round(H*dpr);ctx.setTransform(dpr,0,0,dpr,0,0);sample()}
-function dimensions(o){return {x:(o.u-.5)*W,y:(o.v-.5)*H,r:o.r*Math.min(W,H)}}
-function rayCircle(ox,oy,dx,dy,o){const q=dimensions(o),x=ox-q.x,y=oy-q.y,b=x*dx+y*dy,c=x*x+y*y-q.r*q.r,h=b*b-c;if(h<0)return null;const t=-b-Math.sqrt(h);return t>=0?t:null}
-function edgeDistance(dx,dy){const tx=Math.abs(dx)>1e-8?(W/2)/Math.abs(dx):Infinity,ty=Math.abs(dy)>1e-8?(H/2)/Math.abs(dy):Infinity;return Math.min(tx,ty)}
-function sample(){observations=[];const half=fov/2*Math.PI/180;for(let i=0;i<rayCount;i++){const offset=(rayCount===1?0:(i/(rayCount-1)-.5)*2*half),dir=angle+offset,dx=Math.cos(dir),dy=Math.sin(dir);let distance=edgeDistance(dx,dy),hit=null;for(const o of objects){const t=rayCircle(0,0,dx,dy,o);if(t!==null&&t<distance){distance=t;hit=o}}observations.push({dx,dy,distance,hit})}}
-function pathShape(x,y,r,shape,phase){ctx.beginPath();if(shape==='circle'){ctx.arc(x,y,r,0,TAU)}
-else if(shape==='ellipse'){ctx.ellipse(x,y,r*1.35,r*.68,phase*.25,0,TAU)}
-else{const sides=shape==='triangle'?3:shape==='square'?4:shape==='diamond'?4:shape==='hex'?6:5;for(let i=0;i<sides;i++){let a=-Math.PI/2+i*TAU/sides+(shape==='diamond'?Math.PI/4:shape==='kite'?.22:0),rr=r*(shape==='kite'&&i===0?1.55:1);const px=x+Math.cos(a)*rr,py=y+Math.sin(a)*rr;if(i===0)ctx.moveTo(px,py);else ctx.lineTo(px,py)}ctx.closePath()}}
-function draw(){ctx.clearRect(0,0,W,H);const cx=W/2,cy=H/2,half=fov/2*Math.PI/180;
-ctx.save();ctx.translate(cx,cy);
-ctx.beginPath();ctx.moveTo(0,0);ctx.arc(0,0,Math.hypot(W,H),angle-half,angle+half);ctx.closePath();ctx.fillStyle='#55c9f208';ctx.fill();
-for(const o of objects){const q=dimensions(o);pathShape(q.x,q.y,q.r,o.shape,o.phase);ctx.fillStyle=palette[o.type];ctx.globalAlpha=.88;ctx.fill();ctx.lineWidth=1;ctx.strokeStyle=palette[o.type];ctx.globalAlpha=.55;ctx.stroke();ctx.globalAlpha=1}
-for(const ray of observations){ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(ray.dx*ray.distance,ray.dy*ray.distance);ctx.strokeStyle=ray.hit?(ray.hit.type==='threat'?'#ff7882':palette[ray.hit.type]):'#65d7f2';ctx.globalAlpha=ray.hit?.92:.34;ctx.lineWidth=ray.hit?1.35:.8;ctx.stroke();ctx.globalAlpha=1;if(ray.hit){ctx.beginPath();ctx.arc(ray.dx*ray.distance,ray.dy*ray.distance,2.1,0,TAU);ctx.fillStyle=ray.hit.type==='threat'?'#ff7882':palette[ray.hit.type];ctx.fill()}}
-ctx.beginPath();ctx.arc(0,0,2.4,0,TAU);ctx.fillStyle='#d9faff';ctx.fill();ctx.restore()}
-function frame(now){const dt=Math.min(.05,(now-last)/1000||0);last=now;for(const o of objects){o.u+=o.vx*dt;o.v+=o.vy*dt;if(o.u<.035||o.u>.965){o.vx*=-1;o.u=Math.max(.035,Math.min(.965,o.u))}if(o.v<.04||o.v>.96){o.vy*=-1;o.v=Math.max(.04,Math.min(.96,o.v))}o.phase+=dt*.45}if(now>=nextSample){sample();nextSample=now+1000/pollingHz}draw();requestAnimationFrame(frame)}
+*{box-sizing:border-box}html,body{width:100%;height:100%;margin:0;overflow:hidden;background:#080611}
+body{background:radial-gradient(ellipse at 50% 48%,#17102b 0%,#090813 58%,#04050b 100%)}
+canvas{display:block;width:100vw;height:100dvh;touch-action:none}
+#readout{position:fixed;left:14px;top:12px;color:#d9caff;font:10px/1.5 ui-monospace,monospace;letter-spacing:.13em;opacity:.55;pointer-events:none;text-transform:uppercase}
+#hint{position:fixed;right:14px;top:12px;color:#d9caff;font:10px ui-monospace,monospace;letter-spacing:.1em;opacity:.45;pointer-events:none}
+</style>
+</head>
+<body>
+<canvas id="view" aria-label="A psychedelic living scene explored by sensory rays and reconstructed from observations"></canvas>
+<div id="readout">RAY / living perception</div><div id="hint">1 finger · rotate / 2 fingers · alter field</div>
+<script>
+(()=>{'use strict';
+const canvas=document.getElementById('view'),ctx=canvas.getContext('2d',{alpha:true});
+let W=0,H=0,dpr=1,angle=-Math.PI/2,last=0,nextSample=0;
+let fov=124,rayCount=86,pollingHz=34,elapsed=0;
+const TAU=Math.PI*2,rand=(a,b)=>a+Math.random()*(b-a),clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const hues=[178,205,245,282,318,24,52,126];
+const organisms=[];
+const memories=new Map();
+const hits=[];
+const stars=Array.from({length:100},()=>({x:Math.random(),y:Math.random(),r:rand(.3,1.5),p:rand(0,TAU)}));
+function makeOrganism(kind,u,v,scale,hue,group=0){
+ const o={id:organisms.length,kind,u,v,scale,hue,phase:rand(0,TAU),speed:rand(.45,1.1),orbit:rand(0,TAU),group,seed:rand(0,1000),trail:[],children:[]};
+ if(kind==='shoal'){o.count=rand(10,19)|0;o.members=Array.from({length:o.count},(_,i)=>({a:i/o.count*TAU+rand(-.3,.3),r:rand(.012,.055),p:rand(0,TAU),s:rand(.5,1.25)}))}
+ organisms.push(o);return o;
+}
+makeOrganism('jelly',.21,.23,.072,190);
+makeOrganism('shoal',.72,.22,.095,48,1);
+makeOrganism('amoeba',.82,.69,.086,300);
+makeOrganism('spiral',.20,.73,.075,145);
+makeOrganism('urchin',.52,.78,.061,260);
+makeOrganism('ribbon',.49,.12,.09,24);
+makeOrganism('shoal',.91,.43,.072,190,2);
+makeOrganism('cell',.37,.48,.05,330);
+makeOrganism('jelly',.63,.49,.052,55);
+function resize(){const r=canvas.getBoundingClientRect();dpr=Math.min(devicePixelRatio||1,2);W=r.width;H=r.height;canvas.width=Math.round(W*dpr);canvas.height=Math.round(H*dpr);ctx.setTransform(dpr,0,0,dpr,0,0);sample()}
+function pos(o){return{x:(o.u-.5)*W,y:(o.v-.5)*H,r:o.scale*Math.min(W,H)}}
+function hue(o,t=elapsed){return (o.hue+42*Math.sin(t*.42+o.phase)+24*Math.sin(t*.17+o.seed))%360}
+function color(h,a=1){return 'hsla('+h+',100%,68%,'+a+')'}
+function distanceToEdge(dx,dy){return Math.min(Math.abs(dx)>1e-8?(W/2)/Math.abs(dx):Infinity,Math.abs(dy)>1e-8?(H/2)/Math.abs(dy):Infinity)}
+function rayCircle(ox,oy,dx,dy,o){const p=pos(o),x=ox-p.x,y=oy-p.y,b=x*dx+y*dy,c=x*x+y*y-p.r*p.r,q=b*b-c;if(q<0)return null;const t=-b-Math.sqrt(q);return t>=0?t:null}
+function rayHit(dx,dy,o){const p=pos(o);return rayCircle(0,0,dx,dy,o)}
+function sample(){const half=fov/2*Math.PI/180,now=elapsed;for(let i=0;i<rayCount;i++){const off=(i/(rayCount-1)-.5)*2*half,dir=angle+off,dx=Math.cos(dir),dy=Math.sin(dir);let d=distanceToEdge(dx,dy),hit=null;for(const o of organisms){const t=rayHit(dx,dy,o);if(t!==null&&t<d){d=t;hit=o}}if(hit){const key=hit.id+':'+Math.round((dir-angle)*1000);memories.set(key,{id:hit.id,offset:off,distance:d,hue:hue(hit),time:now,energy:1});hits.push({x:dx*d,y:dy*d,h:hue(hit),time:now,id:hit.id})}}}
+function path(x,y,r,n,phase,warp=0){ctx.beginPath();for(let i=0;i<=n*3;i++){const a=i/(n*3)*TAU,rad=r*(1+warp*Math.sin(a*5+phase)+warp*.45*Math.sin(a*9-phase*1.3)),px=x+Math.cos(a)*rad,py=y+Math.sin(a)*rad;if(i===0)ctx.moveTo(px,py);else ctx.lineTo(px,py)}ctx.closePath()}
+function glowCircle(x,y,r,h,a=1){ctx.save();ctx.shadowBlur=18;ctx.shadowColor=color(h,.9);ctx.fillStyle=color(h,a);ctx.beginPath();ctx.arc(x,y,r,0,TAU);ctx.fill();ctx.restore()}
+function drawJelly(o,p,h,t){const pulse=1+.12*Math.sin(t*2.4+o.phase),r=p.r*.55*pulse;ctx.save();ctx.translate(p.x,p.y);ctx.rotate(Math.sin(t*.55+o.phase)*.25);ctx.shadowBlur=22;ctx.shadowColor=color(h);ctx.fillStyle=color(h,.24);ctx.strokeStyle=color(h,.95);ctx.lineWidth=1.6;ctx.beginPath();ctx.ellipse(0,-r*.12,r,r*.68,0,Math.PI,TAU);ctx.quadraticCurveTo(r*.8,r*.55,0,r*.48);ctx.quadraticCurveTo(-r*.8,r*.55,-r,r*.0);ctx.fill();ctx.stroke();for(let i=0;i<7;i++){const x=(i-3)*r*.22;ctx.beginPath();ctx.moveTo(x,r*.35);for(let k=1;k<=7;k++){const yy=r*.35+k*r*.19,xx=x+Math.sin(t*2+k*.8+i+o.phase)*r*.12;ctx.lineTo(xx,yy)}ctx.strokeStyle=color(h+35*i, .65);ctx.lineWidth=1.3;ctx.stroke()}ctx.restore()}
+function drawShoal(o,p,h,t){const cx=p.x,cy=p.y;for(let i=0;i<o.members.length;i++){const m=o.members[i],a=m.a+t*(.65+o.speed*.2)+Math.sin(t*.7+m.p)*.22,rad=p.r*(.22+.48*(.5+.5*Math.sin(t*.9+m.p))),x=cx+Math.cos(a)*rad,y=cy+Math.sin(a)*rad*.62,rr=p.r*.075*m.s;ctx.save();ctx.translate(x,y);ctx.rotate(a+Math.PI/2);ctx.fillStyle=color(h+i*8,.78);ctx.shadowBlur=9;ctx.shadowColor=color(h+i*8);ctx.beginPath();ctx.moveTo(0,-rr*1.8);ctx.lineTo(rr,-rr*.2);ctx.lineTo(0,rr*1.8);ctx.lineTo(-rr,-rr*.2);ctx.closePath();ctx.fill();ctx.restore()}}
+function drawAmoeba(o,p,h,t){const pulse=1+.18*Math.sin(t*1.4+o.phase);ctx.save();ctx.translate(p.x,p.y);ctx.rotate(t*.12*o.speed);path(0,0,p.r*.58*pulse,12,t+o.phase,.18);ctx.fillStyle=color(h,.18);ctx.strokeStyle=color(h,.9);ctx.lineWidth=2;ctx.shadowBlur=25;ctx.shadowColor=color(h);ctx.fill();ctx.stroke();for(let i=0;i<9;i++){const a=i*TAU/9+t*.22,r=p.r*.5;const x=Math.cos(a)*r,y=Math.sin(a)*r;ctx.beginPath();ctx.moveTo(x,y);ctx.quadraticCurveTo(x*1.5+Math.sin(t+i)*p.r*.1,y*1.5,x*1.65,y*1.65);ctx.strokeStyle=color(h+i*9,.7);ctx.stroke();glowCircle(x*1.65,y*1.65,p.r*.045,h+i*9,.85)}ctx.restore()}
+function drawSpiral(o,p,h,t){ctx.save();ctx.translate(p.x,p.y);ctx.rotate(t*.22+o.phase);ctx.strokeStyle=color(h,.9);ctx.lineWidth=2;ctx.shadowBlur=15;ctx.shadowColor=color(h);ctx.beginPath();for(let i=0;i<190;i++){const a=i*.105,r=p.r*.008*i/4.7,x=Math.cos(a)*r,y=Math.sin(a)*r;if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y)}ctx.stroke();for(let i=0;i<6;i++){const a=i*TAU/6-t*.35;glowCircle(Math.cos(a)*p.r*.58,Math.sin(a)*p.r*.58,p.r*.07,h+i*18,.8)}ctx.restore()}
+function drawUrchin(o,p,h,t){ctx.save();ctx.translate(p.x,p.y);ctx.rotate(t*.16);for(let i=0;i<28;i++){const a=i/28*TAU,r=p.r*.57,len=p.r*(.3+.13*Math.sin(t*2+i));ctx.beginPath();ctx.moveTo(Math.cos(a)*r,Math.sin(a)*r);ctx.quadraticCurveTo(Math.cos(a+.1)*len*1.2,Math.sin(a+.1)*len*1.2,Math.cos(a)*len,Math.sin(a)*len);ctx.strokeStyle=color(h+i*4,.85);ctx.lineWidth=1.6;ctx.stroke()}glowCircle(0,0,p.r*.4,h,.35);ctx.restore()}
+function drawRibbon(o,p,h,t){ctx.save();ctx.translate(p.x,p.y);ctx.rotate(Math.sin(t*.4+o.phase)*.6);for(let j=0;j<4;j++){ctx.beginPath();for(let i=0;i<=90;i++){const q=i/90,x=(q-.5)*p.r*2.7,y=Math.sin(q*TAU*2+t*1.7+j*.7+o.phase)*p.r*(.18+j*.035)+Math.sin(q*TAU*4-t+j)*p.r*.08;if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y)}ctx.strokeStyle=color(h+j*22,.75);ctx.lineWidth=2.4-j*.35;ctx.shadowBlur=12;ctx.shadowColor=color(h+j*22);ctx.stroke()}ctx.restore()}
+function drawCell(o,p,h,t){ctx.save();ctx.translate(p.x,p.y);ctx.rotate(t*.28);path(0,0,p.r*.52,7,o.phase,.2);ctx.fillStyle=color(h,.16);ctx.strokeStyle=color(h,.95);ctx.lineWidth=2;ctx.shadowBlur=20;ctx.shadowColor=color(h);ctx.fill();ctx.stroke();for(let i=0;i<5;i++){const a=i*TAU/5+t*.3;glowCircle(Math.cos(a)*p.r*.34,Math.sin(a)*p.r*.34,p.r*.1,h+i*16,.85)}ctx.restore()}
+function drawOrganism(o){const p=pos(o),h=hue(o),t=elapsed;ctx.save();ctx.globalCompositeOperation='lighter';if(o.kind==='jelly')drawJelly(o,p,h,t);else if(o.kind==='shoal')drawShoal(o,p,h,t);else if(o.kind==='amoeba')drawAmoeba(o,p,h,t);else if(o.kind==='spiral')drawSpiral(o,p,h,t);else if(o.kind==='urchin')drawUrchin(o,p,h,t);else if(o.kind==='ribbon')drawRibbon(o,p,h,t);else drawCell(o,p,h,t);ctx.restore()}
+function drawReconstruction(){const entries=[...memories.values()].map(m=>({...m,age=elapsed-m.time,weight=Math.exp(-(elapsed-m.time)*.22)})).filter(m=>m.weight>.035).sort((a,b)=>a.offset-b.offset);if(entries.length<2)return;ctx.save();ctx.globalCompositeOperation='screen';ctx.translate(W/2,H/2);const half=fov/2*Math.PI/180;ctx.beginPath();let started=false;for(let i=0;i<entries.length;i++){const m=entries[i],a=angle+m.offset,noise=Math.sin(m.time*2.3+m.id*8+elapsed*.6)*Math.min(18,m.distance*.035)*(1-m.weight*.55),d=m.distance+noise,x=Math.cos(a)*d,y=Math.sin(a)*d;if(!started){ctx.moveTo(x,y);started=true}else ctx.lineTo(x,y)}ctx.strokeStyle='rgba(190,135,255,.42)';ctx.lineWidth=2;ctx.shadowBlur=18;ctx.shadowColor='#a85cff';ctx.stroke();for(let i=0;i<entries.length;i++){const m=entries[i],a=angle+m.offset,d=m.distance+Math.sin(m.time*2+m.id+elapsed)*Math.min(14,m.distance*.025),x=Math.cos(a)*d,y=Math.sin(a)*d;ctx.beginPath();ctx.arc(x,y,1.4+m.weight*2.4,0,TAU);ctx.fillStyle=color(m.hue,.15+m.weight*.8);ctx.fill()}ctx.restore()}
+function draw(){ctx.clearRect(0,0,W,H);const t=elapsed,cx=W/2,cy=H/2;ctx.save();ctx.globalCompositeOperation='screen';for(const s of stars){const a=.1+.25*(.5+.5*Math.sin(t*.8+s.p));glowCircle(s.x*W,s.y*H,s.r,a*0+190,a)}ctx.restore();
+ctx.save();ctx.translate(cx,cy);const half=fov/2*Math.PI/180;ctx.beginPath();ctx.moveTo(0,0);ctx.arc(0,0,Math.hypot(W,H),angle-half,angle+half);ctx.closePath();ctx.fillStyle='rgba(110,70,190,.045)';ctx.fill();ctx.restore();
+for(const o of organisms)drawOrganism(o);
+drawReconstruction();
+ctx.save();ctx.translate(cx,cy);for(let i=0;i<rayCount;i++){const off=(i/(rayCount-1)-.5)*2*half,dir=angle+off,dx=Math.cos(dir),dy=Math.sin(dir);let d=distanceToEdge(dx,dy),hit=null;for(const o of organisms){const q=rayHit(dx,dy,o);if(q!==null&&q<d){d=q;hit=o}}ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(dx*d,dy*d);ctx.strokeStyle=hit?color(hue(hit),.48):'rgba(105,210,255,.15)';ctx.lineWidth=hit?1.05:.55;ctx.stroke()}ctx.restore();
+ctx.save();ctx.globalCompositeOperation='lighter';for(let i=hits.length-1;i>=0;i--){const hit=hits[i],age=t-hit.time,alpha=Math.exp(-age*1.65);if(alpha<.025){hits.splice(i,1);continue}ctx.beginPath();ctx.arc(cx+hit.x,cy+hit.y,1.5+alpha*5,0,TAU);ctx.fillStyle=color(hit.h,alpha);ctx.shadowBlur=18*alpha;ctx.shadowColor=color(hit.h,alpha);ctx.fill();ctx.beginPath();ctx.arc(cx+hit.x,cy+hit.y,3+age*11,0,TAU);ctx.strokeStyle=color(hit.h,alpha*.32);ctx.lineWidth=1;ctx.stroke()}ctx.restore();
+ctx.save();ctx.translate(cx,cy);glowCircle(0,0,3,190,.95);ctx.beginPath();ctx.arc(0,0,8+Math.sin(t*2)*2,0,TAU);ctx.strokeStyle='rgba(150,225,255,.5)';ctx.stroke();ctx.restore();
+}
+function update(dt){elapsed+=dt;for(const o of organisms){o.phase+=dt*.15;const p=pos(o),drift=Math.sin(elapsed*.31+o.seed)*.0008;o.u+=Math.cos(elapsed*.27+o.phase)*dt*.006*o.speed+drift;o.v+=Math.sin(elapsed*.33+o.phase*1.3)*dt*.005*o.speed;if(o.u<.04||o.u>.96)o.u=clamp(o.u,.04,.96),o.phase+=Math.PI;if(o.v<.05||o.v>.95)o.v=clamp(o.v,.05,.95),o.phase+=Math.PI;
+if(o.kind==='shoal'){o.members.forEach(m=>m.a+=dt*(.1+Math.sin(elapsed+m.p)*.035))}}
+for(const [k,m] of memories){if(elapsed-m.time>13)memories.delete(k)}}
+function frame(now){const dt=Math.min(.04,(now-last)/1000||0);last=now;update(dt);if(now>=nextSample){sample();nextSample=now+1000/pollingHz}draw();requestAnimationFrame(frame)}
 const pointers=new Map();let gesture=null;
-function pointOf(e){return{x:e.clientX,y:e.clientY}}
-function twoPointState(){const p=[...pointers.values()];if(p.length<2)return null;const dx=p[1].x-p[0].x,dy=p[1].y-p[0].y;return{x:(p[0].x+p[1].x)/2,y:(p[0].y+p[1].y)/2,d:Math.hypot(dx,dy)}}
-canvas.addEventListener('pointerdown',e=>{pointers.set(e.pointerId,pointOf(e));canvas.setPointerCapture(e.pointerId);if(pointers.size===1)gesture={mode:'rotate',x:e.clientX};else if(pointers.size===2)gesture={mode:'two',state:twoPointState(),vertical:0,horizontal:0};else gesture={mode:'ignore'}});
-canvas.addEventListener('pointermove',e=>{if(!pointers.has(e.pointerId))return;pointers.set(e.pointerId,pointOf(e));if(pointers.size===1&&gesture?.mode==='rotate'){angle+=(e.clientX-gesture.x)*.008;gesture.x=e.clientX;return}if(pointers.size!==2||gesture?.mode!=='two')return;const current=twoPointState(),prev=gesture.state;if(!current||!prev)return;const dx=current.x-prev.x,dy=current.y-prev.y, pinch=current.d-prev.d;
-// Two-finger vertical movement changes ray count in pairs.
-gesture.vertical+=-dy;while(Math.abs(gesture.vertical)>=24){const step=Math.sign(gesture.vertical);rayCount=Math.max(8,Math.min(256,rayCount+step*2));gesture.vertical-=step*24;sample()}
-// Two-finger horizontal movement changes the sensing update frequency.
-gesture.horizontal+=dx;while(Math.abs(gesture.horizontal)>=22){const step=Math.sign(gesture.horizontal);pollingHz=Math.max(1,Math.min(120,pollingHz+step));gesture.horizontal-=step*22}
-// Pinching outward widens the field of view; pinching inward narrows it.
-if(Math.abs(pinch)>0.1)fov=Math.max(20,Math.min(180,fov+pinch*.22));gesture.state=current;
-});
-function endPointer(e){pointers.delete(e.pointerId);if(pointers.size===1){const p=[...pointers.values()][0];gesture={mode:'rotate',x:p.x}}else if(pointers.size>=2){gesture={mode:'two',state:twoPointState(),vertical:0,horizontal:0}}else gesture=null}
-for(const ev of ['pointerup','pointercancel','lostpointercapture'])canvas.addEventListener(ev,endPointer);
+function point(e){return{x:e.clientX,y:e.clientY}}
+function twoState(){const p=[...pointers.values()];if(p.length<2)return null;return{x:(p[0].x+p[1].x)/2,y:(p[0].y+p[1].y)/2,d:Math.hypot(p[1].x-p[0].x,p[1].y-p[0].y)}}
+canvas.addEventListener('pointerdown',e=>{pointers.set(e.pointerId,point(e));canvas.setPointerCapture(e.pointerId);if(pointers.size===1)gesture={mode:'rotate',x:e.clientX};else if(pointers.size===2)gesture={mode:'two',state:twoState(),v:0,h:0}});
+canvas.addEventListener('pointermove',e=>{if(!pointers.has(e.pointerId))return;pointers.set(e.pointerId,point(e));if(pointers.size===1&&gesture?.mode==='rotate'){angle+=(e.clientX-gesture.x)*.008;gesture.x=e.clientX;return}if(pointers.size!==2||gesture?.mode!=='two')return;const s=twoState(),p=gesture.state;if(!s||!p)return;gesture.v+=- (s.y-p.y);gesture.h+=s.x-p.x;while(Math.abs(gesture.v)>=24){const z=Math.sign(gesture.v);rayCount=clamp(rayCount+z*2,12,220);gesture.v-=z*24}while(Math.abs(gesture.h)>=24){const z=Math.sign(gesture.h);pollingHz=clamp(pollingHz+z*2,4,100);gesture.h-=z*24}fov=clamp(fov+(s.d-p.d)*.2,24,178);gesture.state=s});
+function end(e){pointers.delete(e.pointerId);if(pointers.size===1){const p=[...pointers.values()][0];gesture={mode:'rotate',x:p.x}}else if(pointers.size===2)gesture={mode:'two',state:twoState(),v:0,h:0};else gesture=null}
+for(const ev of ['pointerup','pointercancel','lostpointercapture'])canvas.addEventListener(ev,end);
 window.addEventListener('resize',resize);resize();requestAnimationFrame(frame);
-})();</script></body></html>
+})();
+</script>
+</body>
+</html>
