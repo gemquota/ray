@@ -43,18 +43,18 @@ canvas{display:block;width:100vw;height:100dvh;touch-action:none;background:tran
 <button id="helpToggle" type="button" aria-label="Show gesture guide" aria-expanded="false">?</button>
 <div id="guide" role="dialog" aria-label="Gesture controls">
 <h2>RAY / GESTURE GUIDE</h2>
-<div class="group"><strong>ONE FINGER</strong><p><span>Vertical drag</span><span>Total ray positions</span></p><p><span>Horizontal drag</span><span>Active rays</span></p><p><span>Circle around centre</span><span>Rotate FOV</span></p><p><span>Double-tap</span><span>Ray distribution</span></p></div>
-<div class="group"><strong>TWO FINGERS</strong><p><span>Tap</span><span>Contact-only view</span></p><p><span>Vertical drag</span><span>Ray width + contact size</span></p><p><span>Horizontal drag</span><span>FOV width</span></p></div>
-<div class="group"><strong>THREE FINGERS</strong><p><span>Vertical drag</span><span>Cycle frequency</span></p></div>
-<div class="hint">Drag gestures lock to their dominant direction. Begin a circular movement around, not directly on, the centre dot.</div>
+<div class="group"><strong>01 / SAMPLING · ONE FINGER</strong><p><span>Vertical drag</span><span>Total ray positions</span></p><p><span>Horizontal drag</span><span>Active rays</span></p><p><span>Double-tap</span><span>Distribution pattern</span></p><p><span>Circle around centre</span><span>Rotate field direction</span></p></div>
+<div class="group"><strong>02 / GEOMETRY · TWO FINGERS</strong><p><span>Vertical drag</span><span>Ray width + contact size</span></p><p><span>Horizontal drag / pinch</span><span>FOV angular width</span></p><p><span>Tap</span><span>Contact-only view</span></p></div>
+<div class="group"><strong>03 / TIME · THREE FINGERS</strong><p><span>Vertical drag</span><span>Ray-cycle frequency</span></p><p><span>Horizontal drag</span><span>Scene motion speed</span></p><p><span>Tap</span><span>Pause / resume</span></p></div>
+<div class="hint">Finger count selects a control family. Drag direction selects a parameter within that family. Pinch out widens the field; pinch in narrows it.</div>
 </div>
 <script>
 (()=>{'use strict';
 const canvas=document.getElementById('view'),ctx=canvas.getContext('2d',{alpha:true});
 const hud=document.getElementById('hud'),hudName=document.getElementById('hudName'),hudValue=document.getElementById('hudValue'),hudFill=document.getElementById('hudFill'),hudName2=document.getElementById('hudName2'),hudValue2=document.getElementById('hudValue2');
 let W=0,H=0,dpr=1,angle=-Math.PI/2,last=0,nextSample=0,nextCycle=0,observations=[];
-const TAU=Math.PI*2,limits={positions:[8,256],active:[1,64],width:[.45,5],pixel:[1,12],frequency:[0,120],fov:[12,180]};
-const state={fov:120,positions:64,active:12,rayWidth:1.1,pixelSize:2.4,frequency:12,distribution:0,contactOnly:false,cycleOffset:26,phase:0,paused:false};
+const TAU=Math.PI*2,limits={positions:[8,256],active:[1,64],width:[.45,5],pixel:[1,12],frequency:[0,120],fov:[12,180],motion:[0,3]};
+const state={fov:120,positions:64,active:12,rayWidth:1.1,pixelSize:2.4,frequency:12,motionSpeed:1,distribution:0,contactOnly:false,cycleOffset:26,phase:0,paused:false};
 const distributionNames=['UNIFORM','CLUSTERED','PROGRESSIVE'];
 const palette={food:'#9de28c',threat:'#ff7882',object:'#e7b96e',signal:'#91a9ff'};
 const objects=[
@@ -128,7 +128,7 @@ function showFeedback(name,value,ratio,secondary=null){
 function feedbackPair(a,b){hudName.textContent=a.name;hudValue.textContent=a.value;hudFill.style.width=(clamp(a.ratio,0,1)*100)+'%';hudName2.textContent=b.name;hudValue2.textContent=b.value;hud.classList.add('multi','visible');clearTimeout(feedbackTimer);feedbackTimer=setTimeout(()=>hud.classList.remove('visible'),1350)}
 function frame(now){
  const dt=Math.min(.05,(now-last)/1000||0);last=now;
- for(const o of objects){o.u+=o.vx*dt;o.v+=o.vy*dt;if(o.u<.035||o.u>.965){o.vx*=-1;o.u=clamp(o.u,.035,.965)}if(o.v<.04||o.v>.96){o.vy*=-1;o.v=clamp(o.v,.04,.96)}o.phase+=dt*.45}
+ if(!state.paused){const motionDt=dt*state.motionSpeed;for(const o of objects){o.u+=o.vx*motionDt;o.v+=o.vy*motionDt;if(o.u<.035||o.u>.965){o.vx*=-1;o.u=clamp(o.u,.035,.965)}if(o.v<.04||o.v>.96){o.vy*=-1;o.v=clamp(o.v,.04,.96)}o.phase+=motionDt*.45}}
  if(now>=nextSample){sample();nextSample=now+1000/30}
  if(!state.paused&&state.frequency>0&&now>=nextCycle){state.cycleOffset=(state.cycleOffset+1)%state.positions;nextCycle=now+1000/state.frequency}
  draw();requestAnimationFrame(frame);
@@ -184,6 +184,7 @@ function onMove(e){
    else if(Math.hypot(totalX,totalY)>22)gesture.axis=Math.abs(totalX)>Math.abs(totalY)?'horizontal':'vertical';
   }
   if(gesture.axis&&Math.abs(dx)+Math.abs(dy)>0.5){gesture.moved=true;sessionMoved=true}
+  const pinchDelta=cur.d-prev.d;if(Math.abs(pinchDelta)>0.5){gesture.pinchAcc=(gesture.pinchAcc||0)+pinchDelta;while(Math.abs(gesture.pinchAcc)>=5){const d=Math.sign(gesture.pinchAcc);state.fov=clamp(state.fov+d,...limits.fov);gesture.pinchAcc-=d*5}if(Math.abs(pinchDelta)>1){gesture.moved=true;sessionMoved=true;showFeedback('FOV WIDTH',Math.round(state.fov)+'°',(state.fov-limits.fov[0])/(limits.fov[1]-limits.fov[0]))}}
   if(gesture.axis==='horizontal'&&Math.abs(dx)>0.1){gesture.fovAcc=(gesture.fovAcc||0)+dx;while(Math.abs(gesture.fovAcc)>=6){const d=Math.sign(gesture.fovAcc);state.fov=clamp(state.fov+d,...limits.fov);gesture.fovAcc-=d*6}showFeedback('FOV WIDTH',Math.round(state.fov)+'°',(state.fov-limits.fov[0])/(limits.fov[1]-limits.fov[0]))}
   if(gesture.axis==='vertical'&&Math.abs(dy)>0.1){gesture.widthAcc=(gesture.widthAcc||0)-dy;while(Math.abs(gesture.widthAcc)>=10){const d=Math.sign(gesture.widthAcc);state.rayWidth=clamp(state.rayWidth+d*.10,...limits.width);state.pixelSize=clamp(state.pixelSize+d*.22,...limits.pixel);gesture.widthAcc-=d*10}feedbackPair({name:'RAY WIDTH',value:state.rayWidth.toFixed(2),ratio:(state.rayWidth-limits.width[0])/(limits.width[1]-limits.width[0])},{name:'CONTACT PIXEL',value:state.pixelSize.toFixed(1)+' px',ratio:(state.pixelSize-limits.pixel[0])/(limits.pixel[1]-limits.pixel[0])})}
   gesture.last=cur;return;
