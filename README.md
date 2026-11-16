@@ -18,13 +18,25 @@ Tap the **?** in the upper-right corner to open the on-screen gesture guide.
 | 1 | Circular drag around the centre | Rotate the FOV cone |
 | 2 | Single tap | Toggle contact-only reconstruction |
 | 2 | Vertical drag | Adjust ray width and contact-pixel size together |
-| 2 | Horizontal drag | Adjust FOV angular width |
+| 2 | Horizontal drag or pinch | Adjust FOV angular width |
 | 3 | Vertical drag | Adjust ray-cycling frequency |
+| 3 | Horizontal drag | Adjust scene motion speed |
+| 3 | Single tap | Pause / resume the simulation |
+
+### Semantic control groups
+
+The finger count selects a consistent family of related parameters:
+
+- **One finger · Sampling:** ray-position count, active-ray count, distribution pattern, and field direction.
+- **Two fingers · Geometry:** field-of-view width, ray thickness, and contact-pixel size. Pinching out widens the field; pinching in narrows it.
+- **Three fingers · Time:** ray-cycle frequency, scene motion speed, and pause / resume.
+
+Within drag controls, the dominant direction is locked at the start of the gesture. This keeps a diagonal movement from changing two unrelated values at once.
 
 ### Gesture recognition
 
 - Drag direction locks after a short movement threshold, so diagonal motion does not keep switching controls mid-gesture.
-- Two-finger drags also lock to one axis. A diagonal two-finger movement cannot accidentally adjust both FOV width and ray thickness.
+- Two-finger and three-finger drags also lock to one axis. A diagonal movement cannot accidentally adjust two unrelated values at once.
 - FOV rotation is recognised as tangential movement around the centre, within a ring around the centre dot. Dragging directly across the dot is not treated as rotation.
 - Small movements are not interpreted as taps; this prevents a slight finger slip from toggling contact-only mode or triggering a double-tap.
 - The guide is available on demand and does not occupy the artwork permanently.
@@ -35,7 +47,7 @@ Tap the **?** in the upper-right corner to open the on-screen gesture guide.
 - **Clustered:** positions concentrated around the centre.
 - **Progressive:** a central cluster combined with positions spreading towards the FOV edges.
 
-Total ray positions define the sampling locations. Active rays define how many positions are sampled at once. Cycling frequency controls how quickly the active window advances.
+Total ray positions define the sampling locations. Active rays define how many positions are sampled at once. Cycling frequency controls how quickly the active window advances. Scene motion speed independently controls how quickly the entities move.
 
 ### Contact-only reconstruction
 
