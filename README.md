@@ -1,66 +1,19 @@
-# RAY // minimal vision
+# Ray
 
-A standalone, touch-first raycasting experiment built from the minimal vision prototype in [BOIDS](https://github.com/gemquota/boids/blob/main/vision-minimal.html).
+A standalone build of the original minimal vision prototype from [gemquota/boids](https://github.com/gemquota/boids/blob/main/vision-minimal.html).
 
-**Live app:** https://gemquota.github.io/ray/
+The live entry point is restored to that original minimal implementation. The later gesture-enhanced Ray implementation has been preserved in [archive/gesture-enhanced](./archive/gesture-enhanced/).
 
-Ray is deliberately small: one full-screen canvas, moving geometric entities, a field-of-view cone, and a configurable set of sensory rays. Gestures change the perception model directly; a compact translucent HUD briefly explains each change.
+## Run
 
-## Gesture controls
+Open `index.html` in a modern browser, or visit the GitHub Pages deployment:
 
-Tap the **?** in the upper-right corner to open the on-screen gesture guide.
+https://gemquota.github.io/ray/
 
-| Fingers | Gesture | Action |
-|---|---|---|
-| 1 | Double-tap | Cycle ray distribution: uniform → clustered → progressive |
-| 1 | Vertical drag | Change total ray positions |
-| 1 | Horizontal drag | Change simultaneously active rays |
-| 1 | Circular drag around the centre | Rotate the FOV cone |
-| 2 | Single tap | Toggle contact-only reconstruction |
-| 2 | Vertical drag | Adjust ray width and contact-pixel size together |
-| 2 | Horizontal drag or pinch | Adjust FOV angular width |
-| 3 | Vertical drag | Adjust ray-cycling frequency |
-| 3 | Horizontal drag | Adjust scene motion speed |
-| 3 | Single tap | Pause / resume the simulation |
+## Source
 
-### Semantic control groups
-
-The finger count selects a consistent family of related parameters:
-
-- **One finger · Sampling:** ray-position count, active-ray count, distribution pattern, and field direction.
-- **Two fingers · Geometry:** field-of-view width, ray thickness, and contact-pixel size. Pinching out widens the field; pinching in narrows it.
-- **Three fingers · Time:** ray-cycle frequency, scene motion speed, and pause / resume.
-
-Within drag controls, the dominant direction is locked at the start of the gesture. This keeps a diagonal movement from changing two unrelated values at once.
-
-### Gesture recognition
-
-- Drag direction locks after a short movement threshold, so diagonal motion does not keep switching controls mid-gesture.
-- Two-finger and three-finger drags also lock to one axis. A diagonal movement cannot accidentally adjust two unrelated values at once.
-- FOV rotation is recognised as tangential movement around the centre, within a ring around the centre dot. Dragging directly across the dot is not treated as rotation.
-- Small movements are not interpreted as taps; this prevents a slight finger slip from toggling contact-only mode or triggering a double-tap.
-- The guide is available on demand and does not occupy the artwork permanently.
-
-### Ray distributions
-
-- **Uniform:** evenly spaced ray positions across the FOV.
-- **Clustered:** positions concentrated around the centre.
-- **Progressive:** a central cluster combined with positions spreading towards the FOV edges.
-
-Total ray positions define the sampling locations. Active rays define how many positions are sampled at once. Cycling frequency controls how quickly the active window advances. Scene motion speed independently controls how quickly the entities move.
-
-### Contact-only reconstruction
-
-Two-finger tap hides entity bodies and ray shafts, leaving only the ray-hit contact points. This exposes the sampled reconstruction rather than the underlying scene.
-
-### Gesture feedback
-
-Parameter changes produce a small translucent HUD near the bottom of the display. It updates during interaction, shows the current value and a proportional indicator, and fades shortly after the gesture ends. Coupled changes (ray width and contact-pixel size) appear together.
-
-## Run locally
-
-No build step or dependencies are required. Open `index.html` in a modern browser, or serve the repository root with any static HTTP server.
+Original source: [boids/vision-minimal.html](https://github.com/gemquota/boids/blob/main/vision-minimal.html)
 
 ## Deployment
 
-GitHub Pages is deployed from the `main` branch by `.github/workflows/pages.yml`.
+GitHub Pages deploys the repository root from the `main` branch using the workflow in `.github/workflows/pages.yml`.
