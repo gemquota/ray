@@ -22,7 +22,7 @@ jobs:
         uses: actions/checkout@v4
       - name: Validate inline JavaScript
         run: |
-          node -e 'const fs=require("fs");const html=fs.readFileSync("index.html","utf8");const match=html.match(/<script>([\\s\\S]*?)<\\/script>/);if(!match)throw new Error("Inline script missing");new Function(match[1]);console.log("Inline JavaScript syntax OK");'
+          node -e 'const fs=require("fs");const html=fs.readFileSync("index.html","utf8");const match=html.match(/<script>([\s\S]*?)<\/script>/);if(!match)throw new Error("Inline script missing");new Function(match[1]);console.log("Inline JavaScript syntax OK");'
       - name: Configure Pages
         uses: actions/configure-pages@v5
       - name: Upload static site
