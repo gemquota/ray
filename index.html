@@ -20,7 +20,8 @@ canvas{display:block;width:100vw;height:100dvh;touch-action:none}
 (()=>{'use strict';
 const canvas=document.getElementById('view'),ctx=canvas.getContext('2d',{alpha:true});
 let W=0,H=0,dpr=1,angle=-Math.PI/2,last=0,nextSample=0;
-let fov=124,rayCount=64,pollingHz=12,elapsed=0;\nlet rayFrame=[];
+let fov=124,rayCount=64,pollingHz=12,elapsed=0;
+let rayFrame=[];
 const TAU=Math.PI*2,rand=(a,b)=>a+Math.random()*(b-a),clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const hues=[178,205,245,282,318,24,52,126];
 const organisms=[];
