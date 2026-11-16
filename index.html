@@ -154,6 +154,7 @@ function onMove(e){
   let da=a-gesture.lastAngle;if(da>Math.PI)da-=TAU;if(da< -Math.PI)da+=TAU;
   const arc=Math.abs(da)*gesture.centerDistance,radial=Math.abs(radius-gesture.centerDistance);
   if(gesture.rotationEligible&&dist>9&&arc>9&&arc>radial*1.35){gesture.mode='rotate';gesture.lastAngle=a;gesture.moved=true;sessionMoved=true;return}
+  if(dist>7){sessionMoved=true;gesture.moved=true}
   if(dist>10){
    if(Math.abs(dy)>Math.abs(dx)*1.2){gesture.mode='positions';gesture.last=p;gesture.moved=true;sessionMoved=true}
    else if(Math.abs(dx)>Math.abs(dy)*1.2){gesture.mode='active';gesture.last=p;gesture.moved=true;sessionMoved=true}
@@ -176,6 +177,7 @@ function onMove(e){
  if(gesture.mode==='two'){
   const cur=twoState(),prev=gesture.last;if(!cur||!prev)return;
   const totalX=cur.x-gesture.start.x,totalY=cur.y-gesture.start.y,dx=cur.x-prev.x,dy=cur.y-prev.y;
+  if(Math.hypot(totalX,totalY)>7){gesture.moved=true;sessionMoved=true}
   if(!gesture.axis&&Math.hypot(totalX,totalY)>10){
    if(Math.abs(totalX)>Math.abs(totalY)*1.2)gesture.axis='horizontal';
    else if(Math.abs(totalY)>Math.abs(totalX)*1.2)gesture.axis='vertical';
