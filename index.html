@@ -189,9 +189,11 @@ function onMove(e){
   gesture.last=cur;return;
  }
  if(gesture.mode==='three'){
-  const p=centroid(),dy=gesture.last.y-p.y;gesture.acc=(gesture.acc||0)+dy;
+  const p=centroid(),dy=gesture.last.y-p.y,dx=gesture.last.x-p.x;gesture.acc=(gesture.acc||0)+dy;gesture.motionAcc=(gesture.motionAcc||0)+dx;
   while(Math.abs(gesture.acc)>=3){const d=Math.sign(gesture.acc);state.frequency=clamp(state.frequency+d,...limits.frequency);gesture.acc-=d*3}
-  gesture.last=p;gesture.moved=true;if(Math.abs(dy)>1)sessionMoved=true;showFeedback('CYCLE FREQUENCY',state.frequency===0?'PAUSED':state.frequency+' Hz',state.frequency/limits.frequency[1]);return;
+  while(Math.abs(gesture.motionAcc)>=12){const d=Math.sign(gesture.motionAcc);state.motionSpeed=clamp(state.motionSpeed+d*.1,...limits.motion);gesture.motionAcc-=d*12}
+  gesture.last=p;gesture.moved=true;if(Math.abs(dy)>1||Math.abs(dx)>1)sessionMoved=true;
+  if(Math.abs(dx)>Math.abs(dy))showFeedback('SCENE SPEED',state.motionSpeed.toFixed(1)+'×',state.motionSpeed/limits.motion[1]);else showFeedback('CYCLE FREQUENCY',state.frequency===0?'PAUSED':state.frequency+' Hz',state.frequency/limits.frequency[1]);return;
  }
 }
 function onUp(e){
