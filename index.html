@@ -141,7 +141,7 @@ function startGesture(){
  const count=pointers.size;
  if(count===1){const p=centroid(),c=center(),radius=Math.hypot(p.x-c.x,p.y-c.y);gesture={count,mode:'pending',start:p,last:p,centerDistance:radius,startAngle:Math.atan2(p.y-c.y,p.x-c.x),lastAngle:Math.atan2(p.y-c.y,p.x-c.x),rotationEligible:radius>Math.min(W,H)*.09&&radius<Math.min(W,H)*.30,moved:false}}
  else if(count===2){const t=twoState();gesture={count,mode:'two',axis:null,start:{x:t.x,y:t.y},last:t,moved:false}}
- else if(count===3){gesture={count,mode:'three',last:centroid(),vertical:0,moved:false}}
+ else if(count===3){const p=centroid();gesture={count,mode:'three',start:p,last:p,axis:null,vertical:0,moved:false}}
  else gesture={count,mode:'ignore'};
 }
 function onDown(e){if(pointers.size===0){sessionMaxCount=0;sessionMoved=false}pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});sessionMaxCount=Math.max(sessionMaxCount,pointers.size);try{canvas.setPointerCapture(e.pointerId)}catch{}startGesture()}
@@ -190,11 +190,12 @@ function onMove(e){
   gesture.last=cur;return;
  }
  if(gesture.mode==='three'){
-  const p=centroid(),dy=gesture.last.y-p.y,dx=gesture.last.x-p.x;gesture.acc=(gesture.acc||0)+dy;gesture.motionAcc=(gesture.motionAcc||0)+dx;
-  while(Math.abs(gesture.acc)>=3){const d=Math.sign(gesture.acc);state.frequency=clamp(state.frequency+d,...limits.frequency);gesture.acc-=d*3}
-  while(Math.abs(gesture.motionAcc)>=12){const d=Math.sign(gesture.motionAcc);state.motionSpeed=clamp(state.motionSpeed+d*.1,...limits.motion);gesture.motionAcc-=d*12}
-  gesture.last=p;gesture.moved=true;if(Math.abs(dy)>1||Math.abs(dx)>1)sessionMoved=true;
-  if(Math.abs(dx)>Math.abs(dy))showFeedback('SCENE SPEED',state.motionSpeed.toFixed(1)+'×',state.motionSpeed/limits.motion[1]);else showFeedback('CYCLE FREQUENCY',state.frequency===0?'PAUSED':state.frequency+' Hz',state.frequency/limits.frequency[1]);return;
+  const p=centroid(),dx=p.x-gesture.start.x,dy=p.y-gesture.start.y;
+  if(!gesture.axis&&Math.hypot(dx,dy)>10){if(Math.abs(dx)>Math.abs(dy)*1.2)gesture.axis='horizontal';else if(Math.abs(dy)>Math.abs(dx)*1.2)gesture.axis='vertical';else if(Math.hypot(dx,dy)>22)gesture.axis=Math.abs(dx)>Math.abs(dy)?'horizontal':'vertical'}
+  if(gesture.axis==='vertical'){const delta=gesture.last.y-p.y;gesture.acc=(gesture.acc||0)+delta;while(Math.abs(gesture.acc)>=3){const d=Math.sign(gesture.acc);state.frequency=clamp(state.frequency+d,...limits.frequency);gesture.acc-=d*3}}
+  if(gesture.axis==='horizontal'){const delta=gesture.last.x-p.x;gesture.motionAcc=(gesture.motionAcc||0)+delta;while(Math.abs(gesture.motionAcc)>=12){const d=Math.sign(gesture.motionAcc);state.motionSpeed=clamp(state.motionSpeed+d*.1,...limits.motion);gesture.motionAcc-=d*12}}
+  if(gesture.axis){gesture.moved=true;sessionMoved=true;if(gesture.axis==='horizontal')showFeedback('SCENE SPEED',state.motionSpeed.toFixed(1)+'×',state.motionSpeed/limits.motion[1]);else showFeedback('CYCLE FREQUENCY',state.frequency===0?'PAUSED':state.frequency+' Hz',state.frequency/limits.frequency[1])}
+  gesture.last=p;return;
  }
 }
 function onUp(e){
