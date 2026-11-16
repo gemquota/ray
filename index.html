@@ -193,7 +193,7 @@ function onMove(e){
   const p=centroid(),dx=p.x-gesture.start.x,dy=p.y-gesture.start.y;
   if(!gesture.axis&&Math.hypot(dx,dy)>10){if(Math.abs(dx)>Math.abs(dy)*1.2)gesture.axis='horizontal';else if(Math.abs(dy)>Math.abs(dx)*1.2)gesture.axis='vertical';else if(Math.hypot(dx,dy)>22)gesture.axis=Math.abs(dx)>Math.abs(dy)?'horizontal':'vertical'}
   if(gesture.axis==='vertical'){const delta=gesture.last.y-p.y;gesture.acc=(gesture.acc||0)+delta;while(Math.abs(gesture.acc)>=3){const d=Math.sign(gesture.acc);state.frequency=clamp(state.frequency+d,...limits.frequency);gesture.acc-=d*3}}
-  if(gesture.axis==='horizontal'){const delta=gesture.last.x-p.x;gesture.motionAcc=(gesture.motionAcc||0)+delta;while(Math.abs(gesture.motionAcc)>=12){const d=Math.sign(gesture.motionAcc);state.motionSpeed=clamp(state.motionSpeed+d*.1,...limits.motion);gesture.motionAcc-=d*12}}
+  if(gesture.axis==='horizontal'){const delta=p.x-gesture.last.x;gesture.motionAcc=(gesture.motionAcc||0)+delta;while(Math.abs(gesture.motionAcc)>=12){const d=Math.sign(gesture.motionAcc);state.motionSpeed=clamp(state.motionSpeed+d*.1,...limits.motion);gesture.motionAcc-=d*12}}
   if(gesture.axis){gesture.moved=true;sessionMoved=true;if(gesture.axis==='horizontal')showFeedback('SCENE SPEED',state.motionSpeed.toFixed(1)+'×',state.motionSpeed/limits.motion[1]);else showFeedback('CYCLE FREQUENCY',state.frequency===0?'PAUSED':state.frequency+' Hz',state.frequency/limits.frequency[1])}
   gesture.last=p;return;
  }
