@@ -49,7 +49,7 @@ const objects=[
 {u:.91,v:.38,r:.027,shape:'kite',type:'object',vx:-.046,vy:.049,phase:4.2},
 {u:.34,v:.48,r:.016,shape:'triangle',type:'food',vx:.067,vy:-.038,phase:5}
 ];
-let feedbackTimer=0;
+let feedbackTimer=0,sessionMaxCount=0,sessionMoved=false;
 function clamp(v,a,b){return Math.max(a,Math.min(b,v))}
 function resize(){const r=canvas.getBoundingClientRect();dpr=Math.min(window.devicePixelRatio||1,2);W=r.width;H=r.height;canvas.width=Math.round(W*dpr);canvas.height=Math.round(H*dpr);ctx.setTransform(dpr,0,0,dpr,0,0);sample()}
 function dimensions(o){return{x:(o.u-.5)*W,y:(o.v-.5)*H,r:o.r*Math.min(W,H)}}
@@ -126,7 +126,7 @@ function startGesture(){
  else if(count===3){gesture={count,mode:'three',last:centroid(),vertical:0,moved:false}}
  else gesture={count,mode:'ignore'};
 }
-function onDown(e){pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});try{canvas.setPointerCapture(e.pointerId)}catch{}startGesture()}
+function onDown(e){if(pointers.size===0){sessionMaxCount=0;sessionMoved=false}pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});sessionMaxCount=Math.max(sessionMaxCount,pointers.size);try{canvas.setPointerCapture(e.pointerId)}catch{}startGesture()}
 function onMove(e){
  if(!pointers.has(e.pointerId))return;
  pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
@@ -152,7 +152,7 @@ function onMove(e){
  if(gesture.mode==='two'){
   const cur=twoState(),prev=gesture.last;if(!cur||!prev)return;
   const dx=cur.x-prev.x,dy=cur.y-prev.y;
-  if(Math.abs(dx)+Math.abs(dy)>1)gesture.moved=true;
+  if(Math.abs(dx)+Math.abs(dy)>1){gesture.moved=true;sessionMoved=true}
   if(Math.abs(dx)>0.1){gesture.fovAcc=(gesture.fovAcc||0)+dx;while(Math.abs(gesture.fovAcc)>=12){const d=Math.sign(gesture.fovAcc);state.fov=clamp(state.fov+d*1.5,...limits.fov);gesture.fovAcc-=d*12}showFeedback('FOV WIDTH',Math.round(state.fov)+'°',(state.fov-limits.fov[0])/(limits.fov[1]-limits.fov[0]))}
   if(Math.abs(dy)>0.1){gesture.widthAcc=(gesture.widthAcc||0)-dy;while(Math.abs(gesture.widthAcc)>=14){const d=Math.sign(gesture.widthAcc);state.rayWidth=clamp(state.rayWidth+d*.08,...limits.width);state.pixelSize=clamp(state.pixelSize+d*.18,...limits.pixel);gesture.widthAcc-=d*14}feedbackPair({name:'RAY WIDTH',value:state.rayWidth.toFixed(2),ratio:(state.rayWidth-limits.width[0])/(limits.width[1]-limits.width[0])},{name:'CONTACT PIXEL',value:state.pixelSize.toFixed(1)+' px',ratio:(state.pixelSize-limits.pixel[0])/(limits.pixel[1]-limits.pixel[0])})}
   gesture.last=cur;return;
@@ -160,14 +160,16 @@ function onMove(e){
  if(gesture.mode==='three'){
   const p=centroid(),dy=gesture.last.y-p.y;gesture.acc=(gesture.acc||0)+dy;
   while(Math.abs(gesture.acc)>=12){const d=Math.sign(gesture.acc);state.frequency=clamp(state.frequency+d,...limits.frequency);gesture.acc-=d*12}
-  gesture.last=p;gesture.moved=true;showFeedback('CYCLE FREQUENCY',state.frequency===0?'PAUSED':state.frequency+' Hz',state.frequency/limits.frequency[1]);return;
+  gesture.last=p;gesture.moved=true;if(Math.abs(dy)>1)sessionMoved=true;showFeedback('CYCLE FREQUENCY',state.frequency===0?'PAUSED':state.frequency+' Hz',state.frequency/limits.frequency[1]);return;
  }
 }
 function onUp(e){
- const g=gesture,wasCount=pointers.size;pointers.delete(e.pointerId);
- if(wasCount===2&&g?.count===2&&!g.moved){state.contactOnly=!state.contactOnly;showFeedback('CONTACT-ONLY VIEW',state.contactOnly?'ON':'OFF',state.contactOnly?1:0)}
- else if(wasCount===1&&g?.count===1&&!g.moved){const now=performance.now();if(now-lastTap<330){tapCount++;}else tapCount=1;lastTap=now;clearTimeout(tapTimer);tapTimer=setTimeout(()=>{if(tapCount>=2){state.distribution=(state.distribution+1)%distributionNames.length;sample();showFeedback('RAY DISTRIBUTION',distributionNames[state.distribution],state.distribution/(distributionNames.length-1))}tapCount=0},340)}
- if(pointers.size){startGesture()}else gesture=null;
+ const g=gesture;pointers.delete(e.pointerId);
+ if(pointers.size){startGesture();return}
+ const now=performance.now(),moved=sessionMoved||!!g?.moved,count=sessionMaxCount;
+ if(count===2&&!moved){state.contactOnly=!state.contactOnly;showFeedback('CONTACT-ONLY VIEW',state.contactOnly?'ON':'OFF',state.contactOnly?1:0)}
+ else if(count===1&&!moved){if(now-lastTap<330){tapCount++;}else tapCount=1;lastTap=now;clearTimeout(tapTimer);tapTimer=setTimeout(()=>{if(tapCount>=2){state.distribution=(state.distribution+1)%distributionNames.length;sample();showFeedback('RAY DISTRIBUTION',distributionNames[state.distribution],state.distribution/(distributionNames.length-1))}tapCount=0},340)}
+ gesture=null;sessionMaxCount=0;sessionMoved=false;
 }
 canvas.addEventListener('pointerdown',onDown);canvas.addEventListener('pointermove',onMove);canvas.addEventListener('pointerup',onUp);canvas.addEventListener('pointercancel',onUp);canvas.addEventListener('lostpointercapture',e=>{if(pointers.has(e.pointerId))onUp(e)});
 window.addEventListener('resize',resize);resize();document.getElementById('help').classList.add('visible');setTimeout(()=>document.getElementById('help').classList.remove('visible'),2400);requestAnimationFrame(frame);
