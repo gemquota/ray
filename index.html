@@ -36,7 +36,7 @@ const canvas=document.getElementById('view'),ctx=canvas.getContext('2d',{alpha:t
 const hud=document.getElementById('hud'),hudName=document.getElementById('hudName'),hudValue=document.getElementById('hudValue'),hudFill=document.getElementById('hudFill'),hudName2=document.getElementById('hudName2'),hudValue2=document.getElementById('hudValue2');
 let W=0,H=0,dpr=1,angle=-Math.PI/2,last=0,nextSample=0,nextCycle=0,observations=[];
 const TAU=Math.PI*2,limits={positions:[8,256],active:[1,64],width:[.45,5],pixel:[1,12],frequency:[0,120],fov:[12,180]};
-const state={fov:120,positions:64,active:12,rayWidth:1.1,pixelSize:2.4,frequency:12,distribution:0,contactOnly:false,cycleOffset:0,phase:0,paused:false};
+const state={fov:120,positions:64,active:12,rayWidth:1.1,pixelSize:2.4,frequency:12,distribution:0,contactOnly:false,cycleOffset:26,phase:0,paused:false};
 const distributionNames=['UNIFORM','CLUSTERED','PROGRESSIVE'];
 const palette={food:'#9de28c',threat:'#ff7882',object:'#e7b96e',signal:'#91a9ff'};
 const objects=[
