@@ -15,12 +15,12 @@ canvas{display:block;width:100vw;height:100dvh;touch-action:none}
 </head>
 <body>
 <canvas id="view" aria-label="A psychedelic living scene explored by sensory rays and reconstructed from observations"></canvas>
-<div id="readout">RAY / living perception</div><div id="hint">TAP · AIM / 1 FINGER · CIRCLE AROUND CENTRE TO ROTATE / 2 FINGERS · HORIZONTAL: RAYS, VERTICAL: SAMPLE RATE / 3-FINGER TAP · SHOW/HIDE ENTITIES</div><div id="stats"></div>
+<div id="readout">RAY / living perception</div><div id="hint">TAP TO AIM · 1 FINGER: ORBIT TO TURN · 2 FINGERS: LEFT/RIGHT RAYS, UP/DOWN RATE · 3 FINGERS: INSPECT</div><div id="stats"></div>
 <script>
 (()=>{'use strict';
 const canvas=document.getElementById('view'),ctx=canvas.getContext('2d',{alpha:true}),stats=document.getElementById('stats');
 let W=0,H=0,dpr=1,angle=-Math.PI/2,targetAngle=-Math.PI/2,last=0,lastDraw=0,nextSample=0;
-let fov=124,rayCount=1,pollingHz=120,elapsed=0;
+let fov=124,rayCount=1,pollingHz=240,elapsed=0;
 let rayFrame=[];
 const TAU=Math.PI*2,rand=(a,b)=>a+Math.random()*(b-a),clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const hues=[178,205,245,282,318,24,52,126];
@@ -62,7 +62,7 @@ function shapeContains(o,x,y){
  if(o.kind==='urchin')return d<.55+.16*Math.cos(a*14+o.phase);
  if(o.kind==='ribbon'){const nx=lx/(r*1.45),wave=Math.sin(nx*9+elapsed*1.7+o.phase)*.2+Math.sin(nx*19-elapsed)*.08;return Math.abs(nx)<1&&Math.abs(ly/r-wave)<.16}
  if(o.kind==='spiral'){const target=.08+.42*((a+Math.PI)/(TAU));return Math.abs(d-target)<.065}
- if(o.kind==='cell'){const edge=.48*(1+.17*Math.cos(a*7+o.phase));return d<edge}
+ if(o.kind==='cell'){const edge=.52*(1+.17*Math.cos(a*7+o.phase));return d<edge}
  if(o.kind==='branch'){const edge=.22+.20*Math.max(0,Math.cos(a*5+o.phase))+.17*Math.max(0,Math.cos(a*3-o.phase*1.4))+.08*Math.cos(a*11+o.phase);return d<edge}
  if(o.kind==='crystal'){const sides=7,sector=((a+Math.PI/sides)%(TAU/sides))-Math.PI/sides,edge=.58*Math.cos(Math.PI/sides)/Math.cos(sector);return d<edge*(.92+.08*Math.sin(a*17+o.phase))}
  if(o.kind==='colony'){const lobes=5+Math.floor(o.seed%4),edge=.32+.22*Math.pow(Math.max(0,Math.cos(a*lobes+o.phase)),2)+.10*Math.cos(a*2-o.phase);return d<edge}
@@ -72,20 +72,20 @@ function shapeContains(o,x,y){
 function rayHit(dx,dy,o){
  const p=pos(o),bound=p.r*(o.kind==='ribbon'?1.55:['branch','crystal','colony','torus'].includes(o.kind)?1.15:o.kind==='jelly'?.72:1),x=-p.x,y=-p.y,b=x*dx+y*dy,c=x*x+y*y-bound*bound,q=b*b-c;if(q<0)return null;
  const root=Math.sqrt(q),start=Math.max(0,-b-root),end=-b+root;if(end<0)return null;
- const steps=84,step=(end-start)/steps;
+ const steps=clamp(Math.ceil((end-start)/Math.max(1.25,p.r/64)),24,320),step=(end-start)/steps;
  for(let i=0;i<=steps;i++){const t=start+i*step;if(shapeContains(o,dx*t,dy*t))return t}
  return null;
 }
-function sample(){const half=fov/2*Math.PI/180,now=elapsed;rayFrame.length=0;for(let i=0;i<rayCount;i++){const off=(rayCount===1?0:(i/(rayCount-1)-.5)*2*half),dir=angle+off,dx=Math.cos(dir),dy=Math.sin(dir);let d=distanceToEdge(dx,dy),hit=null;for(const o of organisms){const t=rayHit(dx,dy,o);if(t!==null&&t<d){d=t;hit=o}}rayFrame.push({dx,dy,d,hit});if(hit){const center=pos(hit),wx=dx*d-center.x,wy=dy*d-center.y,co=Math.cos(hit.rotation),si=Math.sin(hit.rotation),lx=wx*co+wy*si,ly=-wx*si+wy*co,localAngle=(Math.atan2(ly,lx)+TAU)%TAU,bin=Math.round(localAngle/TAU*96)%96,model=memories.get(hit.id)||{id:hit.id,bins:Array(96).fill(null),h:hue(hit),lastSeen:now};const old=model.bins[bin],radius=Math.hypot(lx,ly)/center.r;model.bins[bin]=old===null?radius:old*.72+radius*.28;model.h=hue(hit);model.lastSeen=now;model.observations=(model.observations||0)+1;memories.set(hit.id,model);if(i%2===0){hits.push({x:dx*d,y:dy*d,h:hue(hit),time:now,id:hit.id});if(hits.length>180)hits.splice(0,hits.length-180)}}} }
+function sample(){const half=fov/2*Math.PI/180,now=elapsed;rayFrame.length=0;for(let i=0;i<rayCount;i++){const off=(rayCount===1?0:(i/(rayCount-1)-.5)*2*half),dir=angle+off,dx=Math.cos(dir),dy=Math.sin(dir);let d=distanceToEdge(dx,dy),hit=null;for(const o of organisms){const t=rayHit(dx,dy,o);if(t!==null&&t<d){d=t;hit=o}}rayFrame.push({dx,dy,d,hit});if(hit){const center=pos(hit),wx=dx*d-center.x,wy=dy*d-center.y,co=Math.cos(hit.rotation),si=Math.sin(hit.rotation),lx=wx*co+wy*si,ly=-wx*si+wy*co,localAngle=(Math.atan2(ly,lx)+TAU)%TAU,bin=Math.round(localAngle/TAU*96)%96,model=memories.get(hit.id)||{id:hit.id,bins:Array(96).fill(null),h:hue(hit),lastSeen:now};const old=model.bins[bin],radius=Math.hypot(lx,ly)/center.r;model.bins[bin]=old===null?radius:old*.82+radius*.18;model.h=hue(hit);model.lastSeen=now;model.observations=(model.observations||0)+1;memories.set(hit.id,model);if(i%2===0){hits.push({x:dx*d,y:dy*d,h:hue(hit),time:now,id:hit.id});if(hits.length>180)hits.splice(0,hits.length-180)}}} }
 function path(x,y,r,n,phase,warp=0){ctx.beginPath();for(let i=0;i<=n*3;i++){const a=i/(n*3)*TAU,rad=r*(1+warp*Math.sin(a*5+phase)+warp*.45*Math.sin(a*9-phase*1.3)),px=x+Math.cos(a)*rad,py=y+Math.sin(a)*rad;if(i===0)ctx.moveTo(px,py);else ctx.lineTo(px,py)}ctx.closePath()}
 function glowCircle(x,y,r,h,a=1){ctx.save();ctx.shadowBlur=18;ctx.shadowColor=color(h,.9);ctx.fillStyle=color(h,a);ctx.beginPath();ctx.arc(x,y,r,0,TAU);ctx.fill();ctx.restore()}
 function drawJelly(o,p,h,t){const pulse=1+.12*Math.sin(t*2.4+o.phase),r=p.r*.55*pulse;ctx.save();ctx.translate(p.x,p.y);ctx.rotate(Math.sin(t*.55+o.phase)*.25);ctx.shadowBlur=22;ctx.shadowColor=color(h);ctx.fillStyle=color(h,.24);ctx.strokeStyle=color(h,.95);ctx.lineWidth=1.6;ctx.beginPath();ctx.ellipse(0,-r*.12,r,r*.68,0,Math.PI,TAU);ctx.quadraticCurveTo(r*.8,r*.55,0,r*.48);ctx.quadraticCurveTo(-r*.8,r*.55,-r,r*.0);ctx.fill();ctx.stroke();for(let i=0;i<7;i++){const x=(i-3)*r*.22;ctx.beginPath();ctx.moveTo(x,r*.35);for(let k=1;k<=7;k++){const yy=r*.35+k*r*.19,xx=x+Math.sin(t*2+k*.8+i+o.phase)*r*.12;ctx.lineTo(xx,yy)}ctx.strokeStyle=color(h+35*i, .65);ctx.lineWidth=1.3;ctx.stroke()}ctx.restore()}
 function drawShoal(o,p,h,t){const cx=p.x,cy=p.y;for(let i=0;i<o.members.length;i++){const m=o.members[i],a=m.a+t*(.65+o.speed*.2)+Math.sin(t*.7+m.p)*.22,rad=p.r*(.22+.48*(.5+.5*Math.sin(t*.9+m.p))),x=cx+Math.cos(a)*rad,y=cy+Math.sin(a)*rad*.62,rr=p.r*.075*m.s;ctx.save();ctx.translate(x,y);ctx.rotate(a+Math.PI/2);ctx.fillStyle=color(h+i*8,.78);ctx.shadowBlur=9;ctx.shadowColor=color(h+i*8);ctx.beginPath();ctx.moveTo(0,-rr*1.8);ctx.lineTo(rr,-rr*.2);ctx.lineTo(0,rr*1.8);ctx.lineTo(-rr,-rr*.2);ctx.closePath();ctx.fill();ctx.restore()}}
-function drawAmoeba(o,p,h,t){const pulse=1+.18*Math.sin(t*1.4+o.phase);ctx.save();ctx.translate(p.x,p.y);ctx.rotate(t*.12*o.speed);path(0,0,p.r*.58*pulse,12,t+o.phase,.18);ctx.fillStyle=color(h,.18);ctx.strokeStyle=color(h,.9);ctx.lineWidth=2;ctx.shadowBlur=25;ctx.shadowColor=color(h);ctx.fill();ctx.stroke();for(let i=0;i<9;i++){const a=i*TAU/9+t*.22,r=p.r*.5;const x=Math.cos(a)*r,y=Math.sin(a)*r;ctx.beginPath();ctx.moveTo(x,y);ctx.quadraticCurveTo(x*1.5+Math.sin(t+i)*p.r*.1,y*1.5,x*1.65,y*1.65);ctx.strokeStyle=color(h+i*9,.7);ctx.stroke();glowCircle(x*1.65,y*1.65,p.r*.045,h+i*9,.85)}ctx.restore()}
+function drawAmoeba(o,p,h,t){const pulse=1+.18*Math.sin(t*1.4+o.phase);ctx.save();ctx.translate(p.x,p.y);ctx.beginPath();for(let i=0;i<=96;i++){const a=i/96*TAU,r=p.r*.58*pulse*(1+.2*Math.sin(a*5+o.phase+t*.7)+.09*Math.sin(a*9-o.phase)),x=Math.cos(a)*r,y=Math.sin(a)*r;if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y)}ctx.closePath();ctx.fillStyle=color(h,.18);ctx.strokeStyle=color(h,.9);ctx.lineWidth=2;ctx.shadowBlur=25;ctx.shadowColor=color(h);ctx.fill();ctx.stroke();for(let i=0;i<9;i++){const a=i*TAU/9+t*.22,r=p.r*.5,x=Math.cos(a)*r,y=Math.sin(a)*r;ctx.beginPath();ctx.moveTo(x,y);ctx.quadraticCurveTo(x*1.5+Math.sin(t+i)*p.r*.1,y*1.5,x*1.65,y*1.65);ctx.strokeStyle=color(h+i*9,.7);ctx.stroke();glowCircle(x*1.65,y*1.65,p.r*.045,h+i*9,.85)}ctx.restore()}
 function drawSpiral(o,p,h,t){ctx.save();ctx.translate(p.x,p.y);ctx.rotate(t*.22+o.phase);ctx.strokeStyle=color(h,.9);ctx.lineWidth=2;ctx.shadowBlur=15;ctx.shadowColor=color(h);ctx.beginPath();for(let i=0;i<96;i++){const a=i*.105,r=p.r*.008*i/4.7,x=Math.cos(a)*r,y=Math.sin(a)*r;if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y)}ctx.stroke();for(let i=0;i<6;i++){const a=i*TAU/6-t*.35;glowCircle(Math.cos(a)*p.r*.58,Math.sin(a)*p.r*.58,p.r*.07,h+i*18,.8)}ctx.restore()}
 function drawUrchin(o,p,h,t){ctx.save();ctx.translate(p.x,p.y);ctx.rotate(t*.16);for(let i=0;i<28;i++){const a=i/28*TAU,r=p.r*.57,len=p.r*(.3+.13*Math.sin(t*2+i));ctx.beginPath();ctx.moveTo(Math.cos(a)*r,Math.sin(a)*r);ctx.quadraticCurveTo(Math.cos(a+.1)*len*1.2,Math.sin(a+.1)*len*1.2,Math.cos(a)*len,Math.sin(a)*len);ctx.strokeStyle=color(h+i*4,.85);ctx.lineWidth=1.6;ctx.stroke()}glowCircle(0,0,p.r*.4,h,.35);ctx.restore()}
 function drawRibbon(o,p,h,t){ctx.save();ctx.translate(p.x,p.y);ctx.rotate(Math.sin(t*.4+o.phase)*.6);for(let j=0;j<4;j++){ctx.beginPath();for(let i=0;i<=42;i++){const q=i/42,x=(q-.5)*p.r*2.7,y=Math.sin(q*TAU*2+t*1.7+j*.7+o.phase)*p.r*(.18+j*.035)+Math.sin(q*TAU*4-t+j)*p.r*.08;if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y)}ctx.strokeStyle=color(h+j*22,.75);ctx.lineWidth=2.4-j*.35;ctx.shadowBlur=12;ctx.shadowColor=color(h+j*22);ctx.stroke()}ctx.restore()}
-function drawCell(o,p,h,t){ctx.save();ctx.translate(p.x,p.y);ctx.rotate(t*.28);path(0,0,p.r*.52,7,o.phase,.2);ctx.fillStyle=color(h,.16);ctx.strokeStyle=color(h,.95);ctx.lineWidth=2;ctx.shadowBlur=20;ctx.shadowColor=color(h);ctx.fill();ctx.stroke();for(let i=0;i<5;i++){const a=i*TAU/5+t*.3;glowCircle(Math.cos(a)*p.r*.34,Math.sin(a)*p.r*.34,p.r*.1,h+i*16,.85)}ctx.restore()}
+function drawCell(o,p,h,t){ctx.save();ctx.translate(p.x,p.y);ctx.beginPath();for(let i=0;i<=84;i++){const a=i/84*TAU,r=p.r*.52*(1+.17*Math.cos(a*7+o.phase)),x=Math.cos(a)*r,y=Math.sin(a)*r;if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y)}ctx.closePath();ctx.fillStyle=color(h,.16);ctx.strokeStyle=color(h,.95);ctx.lineWidth=2;ctx.shadowBlur=20;ctx.shadowColor=color(h);ctx.fill();ctx.stroke();for(let i=0;i<5;i++){const a=i*TAU/5+t*.3;glowCircle(Math.cos(a)*p.r*.34,Math.sin(a)*p.r*.34,p.r*.1,h+i*16,.85)}ctx.restore()}
 function drawComplex(o,p,h){
  ctx.save();ctx.translate(p.x,p.y);ctx.rotate(o.rotation);ctx.beginPath();
  for(let i=0;i<=128;i++){const a=i/128*TAU;let r=.5;
@@ -110,21 +110,16 @@ function drawReconstruction(){
   const o=organisms[id],p=pos(o),co=Math.cos(o.rotation),si=Math.sin(o.rotation),fade=visible.has(id)?1:Math.max(0,1-age/.42),pts=[];
   for(let i=0;i<96;i++){
    const v=m.bins[i];if(v===null)continue;
-   // Close small gaps between adjacent measured bearings, but do not invent an unseen far side.
-   const prev=m.bins[(i+95)%96],next=m.bins[(i+1)%96];
-   const radius=prev!==null&&next!==null?(prev+v*2+next)/4:v;
-   const a=i/96*TAU,x=Math.cos(a)*radius*p.r,y=Math.sin(a)*radius*p.r;
+   const a=i/96*TAU,x=Math.cos(a)*v*p.r,y=Math.sin(a)*v*p.r;
    pts.push({index:i,x:p.x+x*co-y*si,y:p.y+x*si+y*co});
   }
   if(pts.length<3)continue;
   const ordered=pts.sort((a,b)=>a.index-b.index);
-  ctx.beginPath();let begun=false;
-  for(const q of ordered){if(!begun){ctx.moveTo(q.x,q.y);begun=true}else ctx.lineTo(q.x,q.y)}
-  // Only close a silhouette once enough of its perimeter has actually been observed.
-  if(ordered.length>=15)ctx.closePath();
-  ctx.fillStyle=color(m.h,.055*fade);ctx.fill();
-  ctx.strokeStyle=color(m.h,.78*fade);ctx.lineWidth=1.35;ctx.stroke();
-  for(const q of ordered){ctx.beginPath();ctx.arc(q.x,q.y,1.25,0,TAU);ctx.fillStyle=color(m.h,.45*fade);ctx.fill()}
+  const runs=[];let run=[];for(let i=0;i<ordered.length;i++){const q=ordered[i],prev=ordered[i-1];if(prev&&q.index-prev.index>4){if(run.length>1)runs.push(run);run=[]}run.push(q)}if(run.length>1)runs.push(run);
+  const coverage=ordered.length/96;
+  for(const segment of runs){ctx.beginPath();segment.forEach((q,i)=>i?ctx.lineTo(q.x,q.y):ctx.moveTo(q.x,q.y));ctx.strokeStyle=color(m.h,.82*fade);ctx.lineWidth=1.5;ctx.stroke();if(segment.length>2){ctx.beginPath();ctx.moveTo(segment[0].x,segment[0].y);segment.forEach(q=>ctx.lineTo(q.x,q.y));ctx.strokeStyle=color(m.h,.22*fade);ctx.lineWidth=3;ctx.stroke()}}
+  if(coverage>.62&&runs.length===1){ctx.beginPath();ordered.forEach((q,i)=>i?ctx.lineTo(q.x,q.y):ctx.moveTo(q.x,q.y));ctx.closePath();ctx.fillStyle=color(m.h,.045*fade);ctx.fill()}
+  for(const q of ordered){ctx.beginPath();ctx.arc(q.x,q.y,1.1,0,TAU);ctx.fillStyle=color(m.h,.38*fade);ctx.fill()}
  }
  ctx.restore();
 }
@@ -146,7 +141,7 @@ function twoState(){const p=[...pointers.values()];if(p.length<2)return null;ret
 function refreshStats(){stats.textContent='RAYS '+rayCount+'  ·  RATE '+pollingHz+' Hz  ·  FOV '+Math.round(fov)+'°'+(entitiesVisible?'  ·  ENTITIES ON':'')}
 canvas.addEventListener('pointerdown',e=>{e.preventDefault();pointers.set(e.pointerId,point(e));if(pointers.size===1)tapCandidate={id:e.pointerId,x:e.clientX,y:e.clientY,moved:false};else tapCandidate=null;try{canvas.setPointerCapture(e.pointerId)}catch(_){}if(pointers.size===1)gesture={mode:'rotate',a:pointerAngle(point(e))};else if(pointers.size===2)gesture={mode:'two',state:twoState(),v:0,h:0};else if(pointers.size===3)threeTap={ids:new Set(pointers.keys()),start:new Map([...pointers].map(([id,p])=>[id,{...p}])),released:new Set(),moved:false};refreshStats()});
 canvas.addEventListener('pointermove',e=>{if(!pointers.has(e.pointerId))return;e.preventDefault();pointers.set(e.pointerId,point(e));if(threeTap&&threeTap.ids.has(e.pointerId)){const q=threeTap.start.get(e.pointerId);if(q&&Math.hypot(e.clientX-q.x,e.clientY-q.y)>12)threeTap.moved=true;}
-if(pointers.size===1&&gesture?.mode==='rotate'){if(tapCandidate&&Math.hypot(e.clientX-tapCandidate.x,e.clientY-tapCandidate.y)>10)tapCandidate.moved=true;const a=pointerAngle(point(e)),delta=Math.atan2(Math.sin(a-gesture.a),Math.cos(a-gesture.a));angle+=delta;targetAngle+=delta;gesture.a=a;nextSample=0;return}if(pointers.size!==2||gesture?.mode!=='two')return;const s=twoState(),p=gesture.state;if(!s||!p)return;const dx=s.x-p.x,dy=s.y-p.y,dd=s.d-p.d;gesture.h+=dx;gesture.v+=dy;while(Math.abs(gesture.h)>=12){const z=Math.sign(gesture.h);rayCount=clamp(rayCount+z*4,1,128);gesture.h-=z*12}while(Math.abs(gesture.v)>=12){const z=Math.sign(gesture.v);pollingHz=clamp(pollingHz-z*2,4,120);gesture.v-=z*12}gesture.state=s;nextSample=0;refreshStats()},{passive:false});
+if(pointers.size===1&&gesture?.mode==='rotate'){if(tapCandidate&&Math.hypot(e.clientX-tapCandidate.x,e.clientY-tapCandidate.y)>10)tapCandidate.moved=true;const a=pointerAngle(point(e)),delta=Math.atan2(Math.sin(a-gesture.a),Math.cos(a-gesture.a));angle+=delta;targetAngle+=delta;gesture.a=a;nextSample=0;return}if(pointers.size!==2||gesture?.mode!=='two')return;const s=twoState(),p=gesture.state;if(!s||!p)return;const dx=s.x-p.x,dy=s.y-p.y,dd=s.d-p.d;gesture.h+=dx;gesture.v+=dy;while(Math.abs(gesture.h)>=12){const z=Math.sign(gesture.h);rayCount=clamp(rayCount+z*Math.max(1,Math.round(rayCount*.06)),1,1024);gesture.h-=z*12}while(Math.abs(gesture.v)>=12){const z=Math.sign(gesture.v);pollingHz=clamp(pollingHz-z*4,1,240);gesture.v-=z*12}gesture.state=s;nextSample=0;refreshStats()},{passive:false});
 function end(e){
  if(threeTap&&threeTap.ids.has(e.pointerId)){if(e.type==='pointercancel'){threeTap=null}else{threeTap.released.add(e.pointerId);if(threeTap.released.size===3){if(!threeTap.moved)entitiesVisible=!entitiesVisible;threeTap=null}}}
  if(tapCandidate&&tapCandidate.id===e.pointerId&&!tapCandidate.moved&&pointers.size===1){targetAngle=Math.atan2(tapCandidate.y-H/2,tapCandidate.x-W/2);nextSample=0}
