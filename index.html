@@ -87,7 +87,7 @@ function drawUrchin(o,p,h,t){ctx.save();ctx.translate(p.x,p.y);ctx.rotate(t*.16)
 function drawRibbon(o,p,h,t){ctx.save();ctx.translate(p.x,p.y);ctx.rotate(Math.sin(t*.4+o.phase)*.6);for(let j=0;j<4;j++){ctx.beginPath();for(let i=0;i<=42;i++){const q=i/42,x=(q-.5)*p.r*2.7,y=Math.sin(q*TAU*2+t*1.7+j*.7+o.phase)*p.r*(.18+j*.035)+Math.sin(q*TAU*4-t+j)*p.r*.08;if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y)}ctx.strokeStyle=color(h+j*22,.75);ctx.lineWidth=2.4-j*.35;ctx.shadowBlur=12;ctx.shadowColor=color(h+j*22);ctx.stroke()}ctx.restore()}
 function drawCell(o,p,h,t){ctx.save();ctx.translate(p.x,p.y);ctx.beginPath();for(let i=0;i<=84;i++){const a=i/84*TAU,r=p.r*.52*(1+.17*Math.cos(a*7+o.phase)),x=Math.cos(a)*r,y=Math.sin(a)*r;if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y)}ctx.closePath();ctx.fillStyle=color(h,.16);ctx.strokeStyle=color(h,.95);ctx.lineWidth=2;ctx.shadowBlur=20;ctx.shadowColor=color(h);ctx.fill();ctx.stroke();for(let i=0;i<5;i++){const a=i*TAU/5+t*.3;glowCircle(Math.cos(a)*p.r*.34,Math.sin(a)*p.r*.34,p.r*.1,h+i*16,.85)}ctx.restore()}
 function drawComplex(o,p,h){
- ctx.save();ctx.translate(p.x,p.y);ctx.rotate(o.rotation);ctx.beginPath();
+ ctx.save();ctx.translate(p.x,p.y);ctx.beginPath();
  for(let i=0;i<=128;i++){const a=i/128*TAU;let r=.5;
   if(o.kind==='branch')r=.22+.20*Math.max(0,Math.cos(a*5+o.phase))+.17*Math.max(0,Math.cos(a*3-o.phase*1.4))+.08*Math.cos(a*11+o.phase);
   else if(o.kind==='crystal'){const sides=7,sector=((a+Math.PI/sides)%(TAU/sides))-Math.PI/sides;r=.58*Math.cos(Math.PI/sides)/Math.cos(sector)*(.92+.08*Math.sin(a*17+o.phase))}
@@ -124,7 +124,7 @@ function drawReconstruction(){
  ctx.restore();
 }
 function draw(){ctx.clearRect(0,0,W,H);const t=elapsed,cx=W/2,cy=H/2;
-if(entitiesVisible)for(const o of organisms)drawOrganism(o);
+if(entitiesVisible)for(const o of organisms)if(memories.has(o.id))drawOrganism(o);
 drawReconstruction();
 ctx.save();ctx.translate(cx,cy);for(const ray of rayFrame){ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(ray.dx*ray.d,ray.dy*ray.d);ctx.strokeStyle=ray.hit?color(hue(ray.hit),.48):'rgba(105,210,255,.15)';ctx.lineWidth=ray.hit?1.05:.55;ctx.stroke()}ctx.restore();
 ctx.save();ctx.globalCompositeOperation='lighter';for(let i=hits.length-1;i>=0;i--){const hit=hits[i],age=t-hit.time,alpha=Math.exp(-age*4.2);if(alpha<.035){hits.splice(i,1);continue}ctx.beginPath();ctx.arc(cx+hit.x,cy+hit.y,1.5+alpha*5,0,TAU);ctx.fillStyle=color(hit.h,alpha);ctx.shadowBlur=0;ctx.fill();ctx.beginPath();ctx.arc(cx+hit.x,cy+hit.y,3+age*11,0,TAU);ctx.strokeStyle=color(hit.h,alpha*.32);ctx.lineWidth=1;ctx.stroke()}ctx.restore();
